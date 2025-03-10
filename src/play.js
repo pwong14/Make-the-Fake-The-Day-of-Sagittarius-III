@@ -177,6 +177,9 @@ class PlayScene extends Phaser.Scene {
     // --- Center Main Camera on Friendly Formation ---
     this.mainCamera.centerOn(friendlyCenter.x, friendlyCenter.y);
 
+    // --- Bullet Tracers Collection ---
+    this.bulletTracers = [];
+
     // --- Combat and AI Timers ---
     this.time.addEvent({
       delay: 500,
@@ -406,6 +409,7 @@ class PlayScene extends Phaser.Scene {
 
   /**
    * Check if groups are in firing range and deal damage.
+   * Also creates animated bullet tracers (animated dashed lines) from attacker to defender.
    */
   checkCombat() {
     for (let player of this.playerGroups) {
@@ -415,7 +419,9 @@ class PlayScene extends Phaser.Scene {
         let dist = Phaser.Math.Distance.Between(player.sprite.x, player.sprite.y, enemy.sprite.x, enemy.sprite.y);
         if (dist < 200) {
           this.dealDamage(player, enemy);
+          this.createBulletTracer(player, enemy);
           this.dealDamage(enemy, player);
+          this.createBulletTracer(enemy, player);
         }
       }
     }
@@ -531,5 +537,71 @@ class PlayScene extends Phaser.Scene {
         }
       }
     });
+
+    // 4) Update animated bullet tracers.
+    for (let i = this.bulletTracers.length - 1; i >= 0; i--) {
+      let tracer = this.bulletTracers[i];
+      let elapsed = this.time.now - tracer.startTime;
+      if (elapsed > tracer.lifetime) {
+        tracer.graphics.destroy();
+        this.bulletTracers.splice(i, 1);
+      } else {
+        // Increment dash offset for animation.
+        tracer.dashOffset += 0.5;
+        tracer.graphics.clear();
+        tracer.graphics.lineStyle(2, 0xffff00, 1);
+        tracer.graphics.beginPath();
+        this.drawDashedLine(
+          tracer.graphics,
+          tracer.attacker.sprite.x, tracer.attacker.sprite.y,
+          tracer.defender.sprite.x, tracer.defender.sprite.y,
+          10, 5, tracer.dashOffset
+        );
+        tracer.graphics.strokePath();
+      }
+    }
+  }
+
+  /**
+   * Draw a dashed line between two points on the provided graphics object.
+   * The dash pattern is animated by applying an offset.
+   */
+  drawDashedLine(graphics, x1, y1, x2, y2, dashLength, gapLength, offset = 0) {
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+    const angle = Math.atan2(dy, dx);
+    const distance = Phaser.Math.Distance.Between(x1, y1, x2, y2);
+    let drawn = -offset;
+    while (drawn < distance) {
+      let start = Math.max(drawn, 0);
+      let end = drawn + dashLength;
+      if (end > distance) {
+        end = distance;
+      }
+      if (start < distance) {
+        let startX = x1 + Math.cos(angle) * start;
+        let startY = y1 + Math.sin(angle) * start;
+        let endX = x1 + Math.cos(angle) * end;
+        let endY = y1 + Math.sin(angle) * end;
+        graphics.moveTo(startX, startY);
+        graphics.lineTo(endX, endY);
+      }
+      drawn += dashLength + gapLength;
+    }
+  }
+
+  /**
+   * Create an animated bullet tracer as an animated dashed line from attacker to defender.
+   */
+  createBulletTracer(attacker, defender) {
+    let tracer = {
+      graphics: this.add.graphics(),
+      attacker: attacker,
+      defender: defender,
+      dashOffset: 0,
+      lifetime: 500, // tracer will last 500ms
+      startTime: this.time.now
+    };
+    this.bulletTracers.push(tracer);
   }
 }
