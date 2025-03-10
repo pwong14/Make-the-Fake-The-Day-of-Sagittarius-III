@@ -60,14 +60,19 @@ class PlayScene extends Phaser.Scene {
     }
     this.gameObjectsContainer.add(gridGraphics);
 
-    // --- Camera Panning (right-click) ---
+    // --- Input Handling ---
+    // Right-click: if a group is selected, unselect it; otherwise, start camera dragging.
     this.draggingCamera = false;
     this.input.mouse.disableContextMenu();
     this.input.on('pointerdown', (pointer) => {
       if (pointer.rightButtonDown()) {
-        this.draggingCamera = true;
-        this.dragStartX = pointer.x;
-        this.dragStartY = pointer.y;
+        if (this.selectedGroup) {
+          this.unselectGroup();
+        } else {
+          this.draggingCamera = true;
+          this.dragStartX = pointer.x;
+          this.dragStartY = pointer.y;
+        }
       } else if (pointer.leftButtonDown()) {
         this.handleLeftClick(pointer);
       }
@@ -126,7 +131,9 @@ class PlayScene extends Phaser.Scene {
         alive: true,
         targetX: sprite.x,
         targetY: sprite.y,
-        highlight: null
+        highlight: null,
+        waypoint: null,      // for the move marker
+        waypointLine: null   // for the connecting line
       };
       this.playerGroups.push(dataObj);
       this.playerGroupData.push(dataObj);
@@ -233,6 +240,7 @@ class PlayScene extends Phaser.Scene {
     }
 
     // --- Minimap Area ---
+    // Draw the minimap background (border and fill)
     let minimapBG = this.add.graphics();
     minimapBG.lineStyle(2, 0xffffff, 1);
     minimapBG.fillStyle(0x000000, 1);
@@ -243,10 +251,10 @@ class PlayScene extends Phaser.Scene {
     minimapBG.setDepth(0);
 
     // Minimap overlay for main camera viewport.
+    // Remove it from the UI container so it isn’t covered by the minimap camera.
     this.minimapOverlay = this.add.graphics();
-    this.uiContainer.add(this.minimapOverlay);
-    this.uiContainer.bringToTop(this.minimapOverlay);
-    // Set overlay depth very high so it appears above the minimap.
+    this.mainCamera.ignore(this.minimapOverlay);
+    this.uiCamera.ignore(this.minimapOverlay);
     this.minimapOverlay.setDepth(100);
 
     this.updateConditionUI();
@@ -304,6 +312,7 @@ class PlayScene extends Phaser.Scene {
       clickedGroup.sprite.add(clickedGroup.highlight);
       this.updateSelectedInfo();
     } else {
+      // If a group is already selected, move it to the clicked location.
       if (this.selectedGroup) {
         this.moveGroupTo(this.selectedGroup, worldPoint.x, worldPoint.y);
       }
@@ -311,13 +320,59 @@ class PlayScene extends Phaser.Scene {
   }
 
   /**
-   * Move a group using physics velocity so that collisions work.
-   * Updates the group's target position and uses physics.moveTo.
+   * Command a group to move by setting its target and using physics.moveTo.
+   * Also places a waypoint (small inverted triangle) and draws a line from the ship.
    */
   moveGroupTo(group, x, y) {
     group.targetX = x;
     group.targetY = y;
     this.physics.moveTo(group.sprite, x, y, group.speed);
+
+    // Remove any existing waypoint and line.
+    if (group.waypoint) {
+      group.waypoint.destroy();
+      group.waypoint = null;
+    }
+    if (group.waypointLine) {
+      group.waypointLine.destroy();
+      group.waypointLine = null;
+    }
+
+    // Create waypoint marker as an inverted triangle.
+    group.waypoint = this.add.graphics();
+    group.waypoint.fillStyle(0xffff00, 1);
+    // Draw a small inverted triangle at (x,y):
+    group.waypoint.fillTriangle(x - 10, y, x + 10, y, x, y + 15);
+
+    // Create a line connecting the ship to the waypoint.
+    group.waypointLine = this.add.graphics();
+    group.waypointLine.lineStyle(2, 0xffff00, 1);
+    group.waypointLine.beginPath();
+    group.waypointLine.moveTo(group.sprite.x, group.sprite.y);
+    group.waypointLine.lineTo(x, y);
+    group.waypointLine.strokePath();
+  }
+
+  /**
+   * Unselect the currently selected group.
+   */
+  unselectGroup() {
+    if (this.selectedGroup) {
+      if (this.selectedGroup.highlight) {
+        this.selectedGroup.highlight.destroy();
+        this.selectedGroup.highlight = null;
+      }
+      if (this.selectedGroup.waypoint) {
+        this.selectedGroup.waypoint.destroy();
+        this.selectedGroup.waypoint = null;
+      }
+      if (this.selectedGroup.waypointLine) {
+        this.selectedGroup.waypointLine.destroy();
+        this.selectedGroup.waypointLine = null;
+      }
+      this.selectedGroup = null;
+      this.updateSelectedInfo();
+    }
   }
 
   /**
@@ -440,7 +495,6 @@ class PlayScene extends Phaser.Scene {
     if (this.minimapOverlay) {
       this.minimapOverlay.clear();
       this.minimapOverlay.lineStyle(2, 0xff0000, 1);
-      // Main camera's viewport (world coordinates)
       let vwX = this.mainCamera.scrollX;
       let vwY = this.mainCamera.scrollY;
       let vwW = this.mainCamera.width / this.mainCamera.zoom;
@@ -453,5 +507,29 @@ class PlayScene extends Phaser.Scene {
       let mmH = vwH * scale;
       this.minimapOverlay.strokeRect(mmX, mmY, mmW, mmH);
     }
+
+    // 3) Update waypoint lines for player groups.
+    this.playerGroups.forEach(group => {
+      if (group.waypoint && group.alive) {
+        const dx = group.targetX - group.sprite.x;
+        const dy = group.targetY - group.sprite.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        // If the group has arrived at its destination, remove the waypoint and line.
+        if (dist < 4) {
+          group.waypoint.destroy();
+          group.waypointLine.destroy();
+          group.waypoint = null;
+          group.waypointLine = null;
+        } else if (group.waypointLine) {
+          // Update the line from the ship's current position to the destination.
+          group.waypointLine.clear();
+          group.waypointLine.lineStyle(2, 0xffff00, 1);
+          group.waypointLine.beginPath();
+          group.waypointLine.moveTo(group.sprite.x, group.sprite.y);
+          group.waypointLine.lineTo(group.targetX, group.targetY);
+          group.waypointLine.strokePath();
+        }
+      }
+    });
   }
 }
