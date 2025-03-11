@@ -27,9 +27,7 @@ class PlayScene extends Phaser.Scene {
     this.uiCamera.setScroll(0, 0);
 
     // Minimap camera for the battlefield.
-    // It will fill the "LOCATION" window’s content area.
-    // LOCATION window is drawn at (960, 370) with size 320x350;
-    // its header is 30px tall so the content area is at (960, 400) and is 320x320.
+    // The "LOCATION" window’s content area starts at y = 370 + headerHeight (i.e. 400) with size 320×320.
     this.minimapCamera = this.cameras.add(960, 400, 320, 320);
     this.minimapCamera.setBounds(0, 0, mapWidth, mapHeight);
     // To display the full map in a 320×320 viewport:
@@ -45,9 +43,10 @@ class PlayScene extends Phaser.Scene {
     // UI camera ignores game objects.
     this.uiCamera.ignore(this.gameObjectsContainer);
 
-    // --- Draw the Grid Background ---
+    // --- Draw the Grid Background for Main Map ---
     let gridGraphics = this.add.graphics();
-    gridGraphics.fillStyle(0x000000, 1);
+    // Set background color for the main map to 0E121C.
+    gridGraphics.fillStyle(0x0E121C, 1);
     gridGraphics.fillRect(0, 0, mapWidth, mapHeight);
     gridGraphics.lineStyle(1, 0x444444, 1);
     for (let x = 0; x <= mapWidth; x += 50) {
@@ -65,15 +64,15 @@ class PlayScene extends Phaser.Scene {
     this.gameObjectsContainer.add(gridGraphics);
 
     // --- Draw Window Frames ---
-    // We define four windows:
-    // 1. Main Map: (x:0, y:0, w:960, h:720) with label "MAIN MAP"
-    // 2. Status: (x:960, y:0, w:320, h:150) with label "STATUS"
-    // 3. Condition: (x:960, y:150, w:320, h:220) with label "CONDITION"
-    // 4. Location: (x:960, y:370, w:320, h:350) with label "LOCATION"
-    this.drawWindowFrame(0, 0, 960, 720, "MAIN MAP");
-    this.drawWindowFrame(960, 0, 320, 150, "STATUS");
-    this.drawWindowFrame(960, 150, 320, 220, "CONDITION");
-    this.drawWindowFrame(960, 370, 320, 350, "LOCATION");
+    // Four windows:
+    // 1. MAIN MAP: (0,0,960×720) -- live game world (0x0E121C already visible)
+    // 2. STATUS: (960,0,320×150) -- static UI, fill with 0x192743
+    // 3. CONDITION: (960,150,320×220) -- static UI, fill with 0x192743
+    // 4. LOCATION (Minimap): (960,370,320×350) -- live minimap view (0x0E121C already visible)
+    this.drawWindowFrame(0, 0, 960, 720, "MAIN MAP", 0x0E121C);
+    this.drawWindowFrame(960, 0, 320, 150, "STATUS", 0x192743);
+    this.drawWindowFrame(960, 150, 320, 220, "CONDITION", 0x192743);
+    this.drawWindowFrame(960, 370, 320, 350, "LOCATION", 0x0E121C);
 
     // --- Input Handling ---
     this.draggingCamera = false;
@@ -201,16 +200,15 @@ class PlayScene extends Phaser.Scene {
       loop: true
     });
 
-    // --- UI Elements for Status & Condition Windows ---
-    // Status window (content area starts at y = 0 + headerHeight = 30)
+    // --- UI Elements for STATUS & CONDITION Windows ---
+    // STATUS window (content area starts at y = 0 + headerHeight = 30)
     this.selectedInfoText = this.add.text(960 + 10, 30 + 10, "NO FLEET SELECTED", {
       fontSize: '16px',
       color: '#ffffff'
     });
     this.uiContainer.add(this.selectedInfoText);
 
-    // Condition window (content area: y = 150 + headerHeight = 180)
-    // We remove any extra in-window header text because the frame label now shows "CONDITION"
+    // CONDITION window (content area: y = 150 + headerHeight = 180)
     this.conditionLines = [];
     for (let i = 0; i < 5; i++) {
       let line = this.add.text(960 + 10, 180 + 10 + i * 20, "", {
@@ -234,16 +232,28 @@ class PlayScene extends Phaser.Scene {
   }
 
   // Helper: Draw a window frame with a thicker header that holds the label.
-  drawWindowFrame(x, y, width, height, label) {
+  // For windows that display a live camera view ("MAIN MAP" and "LOCATION"),
+  // we skip filling the content area so the underlying camera output remains visible.
+  // For the others, fill the content area with the given bgColor.
+  drawWindowFrame(x, y, width, height, label, bgColor) {
     const headerHeight = 30;
-    let g = this.add.graphics();
-    g.lineStyle(2, 0x888888, 1);
-    g.strokeRect(x, y, width, height);
-    g.fillStyle(0x888888, 1);
-    g.fillRect(x, y, width, headerHeight);
-    let labelText = this.add.text(x + width / 2, y + headerHeight / 2, label, { fontSize: '20px', color: '#ffffff' });
+    // Only fill background for "STATUS" and "CONDITION"
+    if (label === "STATUS" || label === "CONDITION") {
+      let bg = this.add.graphics();
+      bg.fillStyle(bgColor, 1);
+      bg.fillRect(x, y + headerHeight, width, height - headerHeight);
+      this.uiContainer.add(bg);
+    }
+    // Draw the border and header using the new border color 0x9FA8C6.
+    let frame = this.add.graphics();
+    frame.lineStyle(2, 0x9FA8C6, 1);
+    frame.strokeRect(x, y, width, height);
+    frame.fillStyle(0x9FA8C6, 1);
+    frame.fillRect(x, y, width, headerHeight);
+    // Place the label text with color 0x0E121C.
+    let labelText = this.add.text(x + width / 2, y + headerHeight / 2, label, { fontSize: '20px', color: '#0E121C' });
     labelText.setOrigin(0.5);
-    this.uiContainer.add(g);
+    this.uiContainer.add(frame);
     this.uiContainer.add(labelText);
   }
 
@@ -501,7 +511,7 @@ class PlayScene extends Phaser.Scene {
       let vwW = this.mainCamera.width / this.mainCamera.zoom;
       let vwH = this.mainCamera.height / this.mainCamera.zoom;
       let scale = this.minimapCamera.zoom;
-      // Use the new location window content origin (960, 400).
+      // Use the "LOCATION" window content origin (960, 400).
       let mmX = 960 + vwX * scale;
       let mmY = 400 + vwY * scale;
       let mmW = vwW * scale;
