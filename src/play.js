@@ -133,7 +133,8 @@ class PlayScene extends Phaser.Scene {
         targetY: sprite.y,
         highlight: null,
         waypoint: null,      // for the move marker
-        waypointLine: null   // for the connecting line
+        waypointLine: null,  // for the connecting line
+        currentTarget: null  // lock-on enemy group
       };
       this.playerGroups.push(dataObj);
       this.playerGroupData.push(dataObj);
@@ -159,7 +160,8 @@ class PlayScene extends Phaser.Scene {
         isPlayer: false,
         alive: true,
         targetX: sprite.x,
-        targetY: sprite.y
+        targetY: sprite.y,
+        currentTarget: null  // lock-on enemy group
       };
       this.enemyGroups.push(dataObj);
     }
@@ -396,7 +398,7 @@ class PlayScene extends Phaser.Scene {
       }
       if (nearest) {
         // Only update movement if enemy is not too close to prevent overlap.
-        if (nearestDist > 50) { 
+        if (nearestDist > 50) {
           enemy.targetX = nearest.sprite.x;
           enemy.targetY = nearest.sprite.y;
           this.physics.moveTo(enemy.sprite, enemy.targetX, enemy.targetY, enemy.speed);
@@ -409,22 +411,66 @@ class PlayScene extends Phaser.Scene {
 
   /**
    * Check if groups are in firing range and deal damage.
-   * Also creates animated bullet tracers (animated dashed lines) from attacker to defender.
+   * Each group locks onto (attacks) only its closest enemy group.
    */
   checkCombat() {
-    for (let player of this.playerGroups) {
-      if (!player.alive) continue;
-      for (let enemy of this.enemyGroups) {
-        if (!enemy.alive) continue;
-        let dist = Phaser.Math.Distance.Between(player.sprite.x, player.sprite.y, enemy.sprite.x, enemy.sprite.y);
+    // For each friendly group.
+    this.playerGroups.forEach(player => {
+      if (!player.alive) return;
+      // If already locked on and valid, continue attacking that target.
+      if (player.currentTarget && player.currentTarget.alive) {
+        let dist = Phaser.Math.Distance.Between(player.sprite.x, player.sprite.y, player.currentTarget.sprite.x, player.currentTarget.sprite.y);
         if (dist < 200) {
-          this.dealDamage(player, enemy);
-          this.createBulletTracer(player, enemy);
-          this.dealDamage(enemy, player);
-          this.createBulletTracer(enemy, player);
+          this.dealDamage(player, player.currentTarget);
+          this.createBulletTracer(player, player.currentTarget);
+          return;
         }
       }
-    }
+      // Otherwise, find the closest enemy in range.
+      let closest = null;
+      let minDist = Infinity;
+      this.enemyGroups.forEach(enemy => {
+        if (!enemy.alive) return;
+        let dist = Phaser.Math.Distance.Between(player.sprite.x, player.sprite.y, enemy.sprite.x, enemy.sprite.y);
+        if (dist < minDist && dist < 200) {
+          minDist = dist;
+          closest = enemy;
+        }
+      });
+      player.currentTarget = closest;
+      if (closest) {
+        this.dealDamage(player, closest);
+        this.createBulletTracer(player, closest);
+      }
+    });
+
+    // For each enemy group.
+    this.enemyGroups.forEach(enemy => {
+      if (!enemy.alive) return;
+      if (enemy.currentTarget && enemy.currentTarget.alive) {
+        let dist = Phaser.Math.Distance.Between(enemy.sprite.x, enemy.sprite.y, enemy.currentTarget.sprite.x, enemy.currentTarget.sprite.y);
+        if (dist < 200) {
+          this.dealDamage(enemy, enemy.currentTarget);
+          this.createBulletTracer(enemy, enemy.currentTarget);
+          return;
+        }
+      }
+      let closest = null;
+      let minDist = Infinity;
+      this.playerGroups.forEach(player => {
+        if (!player.alive) return;
+        let dist = Phaser.Math.Distance.Between(enemy.sprite.x, enemy.sprite.y, player.sprite.x, player.sprite.y);
+        if (dist < minDist && dist < 200) {
+          minDist = dist;
+          closest = player;
+        }
+      });
+      enemy.currentTarget = closest;
+      if (closest) {
+        this.dealDamage(enemy, closest);
+        this.createBulletTracer(enemy, closest);
+      }
+    });
   }
 
   /**
