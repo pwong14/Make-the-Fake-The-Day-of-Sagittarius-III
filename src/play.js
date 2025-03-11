@@ -11,8 +11,9 @@ class PlayScene extends Phaser.Scene {
     // Define map dimensions.
     const mapWidth = 3000;
     const mapHeight = 3000;
+    const headerHeight = 30; // Height for the window header
 
-    // Set the physics world bounds to match the map.
+    // Set the physics world bounds.
     this.physics.world.setBounds(0, 0, mapWidth, mapHeight);
 
     // --- Create Cameras ---
@@ -21,15 +22,18 @@ class PlayScene extends Phaser.Scene {
     this.mainCamera.setBounds(0, 0, mapWidth, mapHeight);
     this.mainCamera.setZoom(1.5);
 
-    // UI camera (fixed) for the right panel.
+    // UI camera for fixed UI elements.
     this.uiCamera = this.cameras.add(0, 0, this.game.config.width, this.game.config.height);
     this.uiCamera.setScroll(0, 0);
 
     // Minimap camera for the battlefield.
-    this.minimapCamera = this.cameras.add(980, 400, 300, 300);
+    // It will fill the "LOCATION" window’s content area.
+    // LOCATION window is drawn at (960, 370) with size 320x350;
+    // its header is 30px tall so the content area is at (960, 400) and is 320x320.
+    this.minimapCamera = this.cameras.add(960, 400, 320, 320);
     this.minimapCamera.setBounds(0, 0, mapWidth, mapHeight);
-    // With a 3000×3000 map, zoom=0.1 shows the entire map.
-    this.minimapCamera.setZoom(0.1);
+    // To display the full map in a 320×320 viewport:
+    this.minimapCamera.setZoom(320 / mapWidth);
 
     // --- Create Containers ---
     this.gameObjectsContainer = this.add.container(0, 0);
@@ -41,7 +45,7 @@ class PlayScene extends Phaser.Scene {
     // UI camera ignores game objects.
     this.uiCamera.ignore(this.gameObjectsContainer);
 
-    // --- Draw Grid Background ---
+    // --- Draw the Grid Background ---
     let gridGraphics = this.add.graphics();
     gridGraphics.fillStyle(0x000000, 1);
     gridGraphics.fillRect(0, 0, mapWidth, mapHeight);
@@ -60,8 +64,18 @@ class PlayScene extends Phaser.Scene {
     }
     this.gameObjectsContainer.add(gridGraphics);
 
+    // --- Draw Window Frames ---
+    // We define four windows:
+    // 1. Main Map: (x:0, y:0, w:960, h:720) with label "MAIN MAP"
+    // 2. Status: (x:960, y:0, w:320, h:150) with label "STATUS"
+    // 3. Condition: (x:960, y:150, w:320, h:220) with label "CONDITION"
+    // 4. Location: (x:960, y:370, w:320, h:350) with label "LOCATION"
+    this.drawWindowFrame(0, 0, 960, 720, "MAIN MAP");
+    this.drawWindowFrame(960, 0, 320, 150, "STATUS");
+    this.drawWindowFrame(960, 150, 320, 220, "CONDITION");
+    this.drawWindowFrame(960, 370, 320, 350, "LOCATION");
+
     // --- Input Handling ---
-    // Right-click: if a group is selected, unselect it; otherwise, start camera dragging.
     this.draggingCamera = false;
     this.input.mouse.disableContextMenu();
     this.input.on('pointerdown', (pointer) => {
@@ -94,19 +108,14 @@ class PlayScene extends Phaser.Scene {
     });
 
     // --- Formation Definitions ---
-    // Formation offsets for a 2x2 grid with center.
-    // Using 100px spacing for clear separation.
     const formationOffsets = [
-      { x: -100, y: -100 }, // top left
-      { x: 100,  y: -100 }, // top right
-      { x: -100, y: 100 },  // bottom left
-      { x: 100,  y: 100 },  // bottom right
-      { x: 0,    y: 0 }     // center
+      { x: -100, y: -100 },
+      { x: 100,  y: -100 },
+      { x: -100, y: 100 },
+      { x: 100,  y: 100 },
+      { x: 0,    y: 0 }
     ];
-
-    // Friendly formation center (near bottom of map)
     const friendlyCenter = { x: 1500, y: mapHeight - 200 };
-    // Enemy formation center (near top of map)
     const enemyCenter = { x: 1500, y: 200 };
 
     // --- Create Friendly Groups ---
@@ -124,7 +133,7 @@ class PlayScene extends Phaser.Scene {
         name: (i + 1).toString().padStart(2, '0'),
         hp: 15000,
         maxHp: 15000,
-        speed: 50, // speed in pixels/sec
+        speed: 50,
         defense: 40,
         offense: 30,
         isPlayer: true,
@@ -132,9 +141,9 @@ class PlayScene extends Phaser.Scene {
         targetX: sprite.x,
         targetY: sprite.y,
         highlight: null,
-        waypoint: null,      // for the move marker
-        waypointLine: null,  // for the connecting line
-        currentTarget: null  // lock-on enemy group
+        waypoint: null,
+        waypointLine: null,
+        currentTarget: null
       };
       this.playerGroups.push(dataObj);
       this.playerGroupData.push(dataObj);
@@ -161,12 +170,12 @@ class PlayScene extends Phaser.Scene {
         alive: true,
         targetX: sprite.x,
         targetY: sprite.y,
-        currentTarget: null  // lock-on enemy group
+        currentTarget: null
       };
       this.enemyGroups.push(dataObj);
     }
 
-    // --- Physics Colliders for Collision Prevention ---
+    // --- Set Up Physics Colliders ---
     this.allShipSprites = [];
     this.playerGroups.forEach(g => this.allShipSprites.push(g.sprite));
     this.enemyGroups.forEach(g => this.allShipSprites.push(g.sprite));
@@ -179,10 +188,8 @@ class PlayScene extends Phaser.Scene {
     // --- Center Main Camera on Friendly Formation ---
     this.mainCamera.centerOn(friendlyCenter.x, friendlyCenter.y);
 
-    // --- Bullet Tracers Collection ---
+    // --- Bullet Tracers Collection & Combat Timers ---
     this.bulletTracers = [];
-
-    // --- Combat and AI Timers ---
     this.time.addEvent({
       delay: 500,
       callback: () => this.checkCombat(),
@@ -194,49 +201,19 @@ class PlayScene extends Phaser.Scene {
       loop: true
     });
 
-    // --- UI Elements in UI Container ---
-    // Draw main play area border (left side)
-    let mainAreaBorder = this.add.graphics();
-    mainAreaBorder.lineStyle(2, 0xffffff, 1);
-    mainAreaBorder.strokeRect(0, 0, 960, 720);
-    this.uiContainer.add(mainAreaBorder);
-
-    // Draw UI panel on right side.
-    let uiBG = this.add.graphics();
-    uiBG.lineStyle(2, 0xffffff, 1);
-    uiBG.fillStyle(0x2f2f2f, 1);
-    uiBG.fillRect(960, 0, 320, 720);
-    uiBG.strokeRect(960, 0, 320, 720);
-    uiBG.beginPath();
-    uiBG.moveTo(960, 180);
-    uiBG.lineTo(1280, 180);
-    uiBG.moveTo(960, 400);
-    uiBG.lineTo(1280, 400);
-    uiBG.strokePath();
-    this.uiContainer.add(uiBG);
-
-    // STATUS text
-    this.statusText = this.add.text(970, 10, "STATUS", {
-      fontSize: '24px',
-      color: '#ffffff'
-    });
-    this.uiContainer.add(this.statusText);
-
-    this.selectedInfoText = this.add.text(970, 40, "NO FLEET SELECTED", {
+    // --- UI Elements for Status & Condition Windows ---
+    // Status window (content area starts at y = 0 + headerHeight = 30)
+    this.selectedInfoText = this.add.text(960 + 10, 30 + 10, "NO FLEET SELECTED", {
       fontSize: '16px',
       color: '#ffffff'
     });
     this.uiContainer.add(this.selectedInfoText);
 
-    this.conditionText = this.add.text(970, 190, "CONDITION OF YOUR SIDE", {
-      fontSize: '20px',
-      color: '#ffffff'
-    });
-    this.uiContainer.add(this.conditionText);
-
+    // Condition window (content area: y = 150 + headerHeight = 180)
+    // We remove any extra in-window header text because the frame label now shows "CONDITION"
     this.conditionLines = [];
     for (let i = 0; i < 5; i++) {
-      let line = this.add.text(970, 220 + i * 20, "", {
+      let line = this.add.text(960 + 10, 180 + 10 + i * 20, "", {
         fontSize: '16px',
         color: '#ffffff'
       });
@@ -244,28 +221,33 @@ class PlayScene extends Phaser.Scene {
       this.uiContainer.add(line);
     }
 
-    // --- Minimap Area ---
-    // Draw the minimap background (border and fill)
-    let minimapBG = this.add.graphics();
-    minimapBG.lineStyle(2, 0xffffff, 1);
-    minimapBG.fillStyle(0x000000, 1);
-    minimapBG.fillRect(980, 400, 300, 300);
-    minimapBG.strokeRect(980, 400, 300, 300);
-    this.uiContainer.add(minimapBG);
-    // Set minimap background depth low.
-    minimapBG.setDepth(0);
-
-    // Minimap overlay for main camera viewport.
-    // Remove it from the UI container so it isn’t covered by the minimap camera.
+    // --- Minimap Overlay (to show main camera viewport within the minimap) ---
+    this.overlayContainer = this.add.container(0, 0);
+    this.mainCamera.ignore(this.overlayContainer);
+    this.uiCamera.ignore(this.overlayContainer);
+    this.minimapCamera.ignore(this.overlayContainer);
     this.minimapOverlay = this.add.graphics();
-    this.mainCamera.ignore(this.minimapOverlay);
-    this.uiCamera.ignore(this.minimapOverlay);
-    this.minimapOverlay.setDepth(100);
+    this.overlayContainer.add(this.minimapOverlay);
+    this.overlayContainer.setDepth(1000);
 
     this.updateConditionUI();
   }
 
-  // Create a triangle container with label.
+  // Helper: Draw a window frame with a thicker header that holds the label.
+  drawWindowFrame(x, y, width, height, label) {
+    const headerHeight = 30;
+    let g = this.add.graphics();
+    g.lineStyle(2, 0x888888, 1);
+    g.strokeRect(x, y, width, height);
+    g.fillStyle(0x888888, 1);
+    g.fillRect(x, y, width, headerHeight);
+    let labelText = this.add.text(x + width / 2, y + headerHeight / 2, label, { fontSize: '20px', color: '#ffffff' });
+    labelText.setOrigin(0.5);
+    this.uiContainer.add(g);
+    this.uiContainer.add(labelText);
+  }
+
+  // Create a triangle (ship) with a label.
   createTriangle(x, y, color, label) {
     const container = this.add.container(x, y);
     const graphics = this.add.graphics();
@@ -277,21 +259,18 @@ class PlayScene extends Phaser.Scene {
     graphics.closePath();
     graphics.fillPath();
     container.add(graphics);
-
     const text = this.add.text(0, 0, label, { fontSize: '16px', color: '#ffffff' }).setOrigin(0.5);
     container.add(text);
-
     this.physics.add.existing(container);
     container.body.setCollideWorldBounds(true);
     container.setSize(40, 40);
     container.body.setOffset(-20, -20);
     container.setInteractive(new Phaser.Geom.Rectangle(-20, -20, 40, 40), Phaser.Geom.Rectangle.Contains);
-    // Add a slight bounce.
     container.body.setBounce(0.4);
     return container;
   }
 
-  // When clicking, if a friendly group is clicked, select it and highlight it.
+  // Handle left-click: select a friendly group or issue a move command.
   handleLeftClick(pointer) {
     const worldPoint = pointer.positionToCamera(this.mainCamera);
     let clickedGroup = null;
@@ -304,36 +283,27 @@ class PlayScene extends Phaser.Scene {
       }
     }
     if (clickedGroup) {
-      // Clear any previous highlights.
       this.playerGroups.forEach(g => {
         if (g.highlight) { g.highlight.destroy(); g.highlight = null; }
       });
       this.selectedGroup = clickedGroup;
-      // Add a highlight (a yellow circle) around the selected group.
       clickedGroup.highlight = this.add.graphics();
       clickedGroup.highlight.lineStyle(3, 0xffff00, 1);
       clickedGroup.highlight.strokeCircle(0, 0, 30);
-      // Attach the highlight to the group so it moves with it.
       clickedGroup.sprite.add(clickedGroup.highlight);
       this.updateSelectedInfo();
     } else {
-      // If a group is already selected, move it to the clicked location.
       if (this.selectedGroup) {
         this.moveGroupTo(this.selectedGroup, worldPoint.x, worldPoint.y);
       }
     }
   }
 
-  /**
-   * Command a group to move by setting its target and using physics.moveTo.
-   * Also places a waypoint (small inverted triangle) and draws a line from the ship.
-   */
+  // Command a group to move; also place a waypoint marker and connecting line.
   moveGroupTo(group, x, y) {
     group.targetX = x;
     group.targetY = y;
     this.physics.moveTo(group.sprite, x, y, group.speed);
-
-    // Remove any existing waypoint and line.
     if (group.waypoint) {
       group.waypoint.destroy();
       group.waypoint = null;
@@ -342,14 +312,9 @@ class PlayScene extends Phaser.Scene {
       group.waypointLine.destroy();
       group.waypointLine = null;
     }
-
-    // Create waypoint marker as an inverted triangle.
     group.waypoint = this.add.graphics();
     group.waypoint.fillStyle(0xffff00, 1);
-    // Draw a small inverted triangle at (x,y):
     group.waypoint.fillTriangle(x - 10, y, x + 10, y, x, y + 15);
-
-    // Create a line connecting the ship to the waypoint.
     group.waypointLine = this.add.graphics();
     group.waypointLine.lineStyle(2, 0xffff00, 1);
     group.waypointLine.beginPath();
@@ -358,9 +323,7 @@ class PlayScene extends Phaser.Scene {
     group.waypointLine.strokePath();
   }
 
-  /**
-   * Unselect the currently selected group.
-   */
+  // Unselect the currently selected group.
   unselectGroup() {
     if (this.selectedGroup) {
       if (this.selectedGroup.highlight) {
@@ -380,9 +343,7 @@ class PlayScene extends Phaser.Scene {
     }
   }
 
-  /**
-   * Enemy AI: for each enemy group, pick the nearest friendly group and move toward it.
-   */
+  // Enemy AI: each enemy group moves toward its nearest friendly target.
   updateEnemyAI() {
     for (let enemy of this.enemyGroups) {
       if (!enemy.alive) continue;
@@ -397,7 +358,6 @@ class PlayScene extends Phaser.Scene {
         }
       }
       if (nearest) {
-        // Only update movement if enemy is not too close to prevent overlap.
         if (nearestDist > 50) {
           enemy.targetX = nearest.sprite.x;
           enemy.targetY = nearest.sprite.y;
@@ -409,15 +369,10 @@ class PlayScene extends Phaser.Scene {
     }
   }
 
-  /**
-   * Check if groups are in firing range and deal damage.
-   * Each group locks onto (attacks) only its closest enemy group.
-   */
+  // Check combat range and deal damage.
   checkCombat() {
-    // For each friendly group.
     this.playerGroups.forEach(player => {
       if (!player.alive) return;
-      // If already locked on and valid, continue attacking that target.
       if (player.currentTarget && player.currentTarget.alive) {
         let dist = Phaser.Math.Distance.Between(player.sprite.x, player.sprite.y, player.currentTarget.sprite.x, player.currentTarget.sprite.y);
         if (dist < 200) {
@@ -426,7 +381,6 @@ class PlayScene extends Phaser.Scene {
           return;
         }
       }
-      // Otherwise, find the closest enemy in range.
       let closest = null;
       let minDist = Infinity;
       this.enemyGroups.forEach(enemy => {
@@ -444,7 +398,6 @@ class PlayScene extends Phaser.Scene {
       }
     });
 
-    // For each enemy group.
     this.enemyGroups.forEach(enemy => {
       if (!enemy.alive) return;
       if (enemy.currentTarget && enemy.currentTarget.alive) {
@@ -473,9 +426,7 @@ class PlayScene extends Phaser.Scene {
     });
   }
 
-  /**
-   * Basic damage calculation.
-   */
+  // Basic damage calculation.
   dealDamage(attacker, defender) {
     let damage = attacker.offense;
     damage = Math.max(0, damage - defender.defense * 0.1);
@@ -494,9 +445,7 @@ class PlayScene extends Phaser.Scene {
     }
   }
 
-  /**
-   * Check if one side has been wiped out.
-   */
+  // Check if one side has been wiped out.
   checkEndCondition() {
     let playerAliveCount = this.playerGroups.filter(g => g.alive).length;
     let enemyAliveCount = this.enemyGroups.filter(g => g.alive).length;
@@ -543,7 +492,7 @@ class PlayScene extends Phaser.Scene {
       }
     });
 
-    // 2) Update the minimap overlay to show main camera's viewport.
+    // 2) Update the minimap overlay to show the main camera's viewport.
     if (this.minimapOverlay) {
       this.minimapOverlay.clear();
       this.minimapOverlay.lineStyle(2, 0xff0000, 1);
@@ -551,9 +500,9 @@ class PlayScene extends Phaser.Scene {
       let vwY = this.mainCamera.scrollY;
       let vwW = this.mainCamera.width / this.mainCamera.zoom;
       let vwH = this.mainCamera.height / this.mainCamera.zoom;
-      // Convert to minimap coordinates (minimap camera positioned at 980,400)
-      let scale = this.minimapCamera.zoom; // 0.1
-      let mmX = 980 + vwX * scale;
+      let scale = this.minimapCamera.zoom;
+      // Use the new location window content origin (960, 400).
+      let mmX = 960 + vwX * scale;
       let mmY = 400 + vwY * scale;
       let mmW = vwW * scale;
       let mmH = vwH * scale;
@@ -566,14 +515,12 @@ class PlayScene extends Phaser.Scene {
         const dx = group.targetX - group.sprite.x;
         const dy = group.targetY - group.sprite.y;
         const dist = Math.sqrt(dx * dx + dy * dy);
-        // If the group has arrived at its destination, remove the waypoint and line.
         if (dist < 4) {
           group.waypoint.destroy();
           group.waypointLine.destroy();
           group.waypoint = null;
           group.waypointLine = null;
         } else if (group.waypointLine) {
-          // Update the line from the ship's current position to the destination.
           group.waypointLine.clear();
           group.waypointLine.lineStyle(2, 0xffff00, 1);
           group.waypointLine.beginPath();
@@ -592,7 +539,6 @@ class PlayScene extends Phaser.Scene {
         tracer.graphics.destroy();
         this.bulletTracers.splice(i, 1);
       } else {
-        // Increment dash offset for animation.
         tracer.dashOffset += 0.5;
         tracer.graphics.clear();
         tracer.graphics.lineStyle(2, 0xffff00, 1);
@@ -608,10 +554,7 @@ class PlayScene extends Phaser.Scene {
     }
   }
 
-  /**
-   * Draw a dashed line between two points on the provided graphics object.
-   * The dash pattern is animated by applying an offset.
-   */
+  // Draw a dashed line between two points on the provided graphics object.
   drawDashedLine(graphics, x1, y1, x2, y2, dashLength, gapLength, offset = 0) {
     const dx = x2 - x1;
     const dy = y2 - y1;
@@ -636,16 +579,14 @@ class PlayScene extends Phaser.Scene {
     }
   }
 
-  /**
-   * Create an animated bullet tracer as an animated dashed line from attacker to defender.
-   */
+  // Create an animated bullet tracer (dashed line) from attacker to defender.
   createBulletTracer(attacker, defender) {
     let tracer = {
       graphics: this.add.graphics(),
       attacker: attacker,
       defender: defender,
       dashOffset: 0,
-      lifetime: 500, // tracer will last 500ms
+      lifetime: 500,
       startTime: this.time.now
     };
     this.bulletTracers.push(tracer);
