@@ -125,7 +125,8 @@ class PlayScene extends Phaser.Scene {
         x: friendlyCenter.x + formationOffsets[i].x,
         y: friendlyCenter.y + formationOffsets[i].y
       };
-      let sprite = this.createTriangle(pos.x, pos.y, 0x00ff00, (i + 1).toString().padStart(2, '0'));
+      // Friendly ships here are created with 0x00FF00.
+      let sprite = this.createTriangle(pos.x, pos.y, 0x00ff00, "はるか");
       this.gameObjectsContainer.add(sprite);
       let dataObj = {
         sprite: sprite,
@@ -155,7 +156,8 @@ class PlayScene extends Phaser.Scene {
         x: enemyCenter.x + formationOffsets[i].x,
         y: enemyCenter.y + formationOffsets[i].y
       };
-      let sprite = this.createTriangle(pos.x, pos.y, 0xff0000, (i + 1).toString().padStart(2, '0'));
+      // Enemy ships are created with 0xFF0000.
+      let sprite = this.createTriangle(pos.x, pos.y, 0xff0000, "はるか");
       this.gameObjectsContainer.add(sprite);
       let dataObj = {
         sprite: sprite,
@@ -232,9 +234,6 @@ class PlayScene extends Phaser.Scene {
   }
 
   // Helper: Draw a window frame with a thicker header that holds the label.
-  // For windows that display a live camera view ("MAIN MAP" and "LOCATION"),
-  // we skip filling the content area so the underlying camera output remains visible.
-  // For the others, fill the content area with the given bgColor.
   drawWindowFrame(x, y, width, height, label, bgColor) {
     const headerHeight = 30;
     // Only fill background for "STATUS" and "CONDITION"
@@ -244,7 +243,7 @@ class PlayScene extends Phaser.Scene {
       bg.fillRect(x, y + headerHeight, width, height - headerHeight);
       this.uiContainer.add(bg);
     }
-    // Draw the border and header using the new border color 0x9FA8C6.
+    // Draw the border and header using the border color 0x9FA8C6.
     let frame = this.add.graphics();
     frame.lineStyle(2, 0x9FA8C6, 1);
     frame.strokeRect(x, y, width, height);
@@ -257,25 +256,122 @@ class PlayScene extends Phaser.Scene {
     this.uiContainer.add(labelText);
   }
 
-  // Create a triangle (ship) with a label.
-  createTriangle(x, y, color, label) {
+  // createTriangle:
+  // - Uses the passed in mainColor (so enemy ships can be 0xFF0000 with 60% opacity).
+  // - Main triangle is defined by three vertices.
+  // - For the top vertex, a small detail triangle is drawn so that its base (the down edge)
+  //   exactly touches the main triangle’s top edge while its tip is moved upward by smallTriangleHeight.
+  // - For the bottom vertices, small triangles are drawn outward so that their tips only touch (without overlaying) the main triangle.
+  // - For enemy ships (mainColor 0xFF0000), the entire container is flipped vertically (while the text is flipped back to remain upright)
+  //   and an HP counter ("15000") is added at the top of the triangle.
+  createTriangle(x, y, mainColor, label) {
+    const color = mainColor;
+    const opacity = 0.6;
     const container = this.add.container(x, y);
     const graphics = this.add.graphics();
-    graphics.fillStyle(color, 1);
+
+    // Define main triangle vertices (elongated ship triangle)
+    const v1 = { x: 0, y: -40 };   // top vertex
+    const v2 = { x: 25, y: 20 };   // bottom right vertex
+    const v3 = { x: -25, y: 20 };  // bottom left vertex
+
+    // Draw the main triangle.
+    graphics.fillStyle(color, opacity);
     graphics.beginPath();
-    graphics.moveTo(0, -20);
-    graphics.lineTo(20, 20);
-    graphics.lineTo(-20, 20);
+    graphics.moveTo(v1.x, v1.y);
+    graphics.lineTo(v2.x, v2.y);
+    graphics.lineTo(v3.x, v3.y);
     graphics.closePath();
     graphics.fillPath();
+
+    // Parameters for small detail triangles.
+    const smallTriangleHeight = 10;
+    const smallTriangleBaseHalf = 5;
+    // Compute center of main triangle.
+    const center = {
+      x: (v1.x + v2.x + v3.x) / 3,
+      y: (v1.y + v2.y + v3.y) / 3
+    };
+
+    // For the top vertex: we want a small triangle whose base exactly touches v1,
+    // and its tip is moved upward (i.e. v1 plus {0, smallTriangleHeight} in the downward direction)
+    // so that it does not overlay the main triangle.
+    function drawSmallTriangleTop(vertex) {
+      const D = { x: 0, y: 1 }; // now points downward
+      const apex = { x: vertex.x + D.x * smallTriangleHeight, y: vertex.y + D.y * smallTriangleHeight };
+      const tangent = { x: -D.y, y: D.x }; // for D = {0,1}, tangent = {x: -1, y: 0}
+      const baseLeft = { x: vertex.x + tangent.x * smallTriangleBaseHalf, y: vertex.y + tangent.y * smallTriangleBaseHalf };
+      const baseRight = { x: vertex.x - tangent.x * smallTriangleBaseHalf, y: vertex.y - tangent.y * smallTriangleBaseHalf };
+      graphics.fillStyle(color, opacity);
+      graphics.beginPath();
+      graphics.moveTo(apex.x, apex.y);
+      graphics.lineTo(baseLeft.x, baseLeft.y);
+      graphics.lineTo(baseRight.x, baseRight.y);
+      graphics.closePath();
+      graphics.fillPath();
+    }
+
+    // For the bottom vertices, draw small triangles that extend outward.
+    function drawSmallTriangleAtVertex(vertex) {
+      // Compute outward direction from center.
+      const dir = { x: vertex.x - center.x, y: vertex.y - center.y };
+      const mag = Math.sqrt(dir.x * dir.x + dir.y * dir.y);
+      const D = { x: dir.x / mag, y: dir.y / mag };
+      // In this case, the apex is at the vertex.
+      const apex = vertex;
+      // The base center is vertex + D * smallTriangleHeight.
+      const baseCenter = { x: vertex.x + D.x * smallTriangleHeight, y: vertex.y + D.y * smallTriangleHeight };
+      const tangent = { x: -D.y, y: D.x };
+      const baseLeft = { x: baseCenter.x + tangent.x * smallTriangleBaseHalf, y: baseCenter.y + tangent.y * smallTriangleBaseHalf };
+      const baseRight = { x: baseCenter.x - tangent.x * smallTriangleBaseHalf, y: baseCenter.y - tangent.y * smallTriangleBaseHalf };
+      graphics.fillStyle(color, opacity);
+      graphics.beginPath();
+      graphics.moveTo(apex.x, apex.y);
+      graphics.lineTo(baseLeft.x, baseLeft.y);
+      graphics.lineTo(baseRight.x, baseRight.y);
+      graphics.closePath();
+      graphics.fillPath();
+    }
+
+    // Draw the small detail triangles.
+    drawSmallTriangleTop(v1);  // top vertex: its base touches v1 and its tip is at v1 + {0, smallTriangleHeight}.
+    drawSmallTriangleAtVertex(v2); // bottom right vertex.
+    drawSmallTriangleAtVertex(v3); // bottom left vertex.
+
     container.add(graphics);
-    const text = this.add.text(0, 0, label, { fontSize: '16px', color: '#ffffff' }).setOrigin(0.5);
+
+    // Add vertical Japanese text ("は\nる\nか") in the center with a smaller font.
+    const text = this.add.text(0, 0, "は\nる\nか", {
+      fontSize: '10px',
+      color: '#ffffff',
+      align: 'center'
+    }).setOrigin(0.5);
     container.add(text);
+
+    // For enemy ships (color 0xFF0000), flip the entire container vertically,
+    // then flip back the label text so it remains upright, and add an HP counter at the top.
+    if (color === 0xff0000) {
+      container.scaleY = -1;
+      text.scaleY = -1; // flip the label back
+
+      // Place HP counter text at the physical top of the enemy ship.
+      // After flipping, the top (highest point) is now at the position corresponding to the original bottom.
+      // We'll choose a position near the top edge (here, we use y = -25 in local coordinates).
+      let hpText = this.add.text(0, -25, "15000", {
+        fontSize: '10px',
+        color: '#ffffff',
+        align: 'center'
+      });
+      hpText.setOrigin(0.5, 1);
+      hpText.scaleY = -1; // flip back so it appears upright
+      container.add(hpText);
+    }
+
     this.physics.add.existing(container);
+    container.setSize(50, 50);
     container.body.setCollideWorldBounds(true);
-    container.setSize(40, 40);
-    container.body.setOffset(-20, -20);
-    container.setInteractive(new Phaser.Geom.Rectangle(-20, -20, 40, 40), Phaser.Geom.Rectangle.Contains);
+    container.body.setOffset(-25, -25);
+    container.setInteractive(new Phaser.Geom.Rectangle(-25, -25, 50, 50), Phaser.Geom.Rectangle.Contains);
     container.body.setBounce(0.4);
     return container;
   }
@@ -511,7 +607,6 @@ class PlayScene extends Phaser.Scene {
       let vwW = this.mainCamera.width / this.mainCamera.zoom;
       let vwH = this.mainCamera.height / this.mainCamera.zoom;
       let scale = this.minimapCamera.zoom;
-      // Use the "LOCATION" window content origin (960, 400).
       let mmX = 960 + vwX * scale;
       let mmY = 400 + vwY * scale;
       let mmW = vwW * scale;
