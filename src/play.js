@@ -11,7 +11,7 @@ class PlayScene extends Phaser.Scene {
     // Define map dimensions.
     const mapWidth = 3000;
     const mapHeight = 3000;
-    const headerHeight = 30; // Height for the window header
+    const headerHeight = 20; // Height for the window header
 
     // Set the physics world bounds.
     this.physics.world.setBounds(0, 0, mapWidth, mapHeight);
@@ -55,9 +55,9 @@ class PlayScene extends Phaser.Scene {
     this.gameObjectsContainer.add(gridGraphics);
 
     // --- Draw Window Frames ---
-    this.drawWindowFrame(0, 0, 960, 720, "MAIN MAP", 0x0E121C);
+    this.drawWindowFrame(0, 0, 960, 720, "Map (x 1)", 0x0E121C);
     this.drawWindowFrame(960, 0, 320, 150, "STATUS", 0x192743);
-    this.drawWindowFrame(960, 150, 320, 220, "CONDITION", 0x192743);
+    this.drawWindowFrame(960, 150, 320, 220, "CONDITION OF YOUR SIDE", 0x192743);
     this.drawWindowFrame(960, 370, 320, 350, "LOCATION", 0x0E121C);
 
     // --- Input Handling ---
@@ -217,8 +217,8 @@ class PlayScene extends Phaser.Scene {
 
   // Helper: Draw a window frame.
   drawWindowFrame(x, y, width, height, label, bgColor) {
-    const headerHeight = 30;
-    if (label === "STATUS" || label === "CONDITION") {
+    const headerHeight = 20;
+    if (label === "STATUS" || label === "CONDITION OF YOUR SIDE") {
       let bg = this.add.graphics();
       bg.fillStyle(bgColor, 1);
       bg.fillRect(x, y + headerHeight, width, height - headerHeight);
@@ -229,11 +229,17 @@ class PlayScene extends Phaser.Scene {
     frame.strokeRect(x, y, width, height);
     frame.fillStyle(0x9FA8C6, 1);
     frame.fillRect(x, y, width, headerHeight);
-    let labelText = this.add.text(x + width / 2, y + headerHeight / 2, label, { fontSize: '20px', color: '#0E121C' });
-    labelText.setOrigin(0.5);
+    // Create left-aligned label text using Arial Unicode MS.
+    let labelText = this.add.text(x + 10, y + headerHeight / 2, label, { 
+      fontSize: '14px', 
+      color: '#0E121C',
+      fontFamily: "Arial Unicode MS",
+      align: 'left'
+    });
+    labelText.setOrigin(0, 0.5);
     this.uiContainer.add(frame);
     this.uiContainer.add(labelText);
-  }
+  }  
 
   // createTriangle: Draws the ship group.
   // - Draws the main triangle and its small detail triangles.
