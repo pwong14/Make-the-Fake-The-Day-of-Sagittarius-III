@@ -3,6 +3,19 @@ class PlayScene extends Phaser.Scene {
     super({ key: 'PlayScene' });
   }
 
+  preload() {
+    // Load sounds
+    this.load.audio('explosion', 'assets/explosion.mp3');
+    this.load.audio('spaceAttack', 'assets/spaceAttack.mp3');
+
+    // Load portrait images.
+    this.load.image('asahina', 'assets/asahina.png');
+    this.load.image('haruhi', 'assets/haruhi.png');
+    this.load.image('nagato', 'assets/nagato.png');
+    this.load.image('koizumi', 'assets/koizumi.png');
+    this.load.image('kyon', 'assets/kyon.png');
+  }
+
   init(data) {
     this.selectedLevel = data.level || 1;
   }
@@ -103,6 +116,9 @@ class PlayScene extends Phaser.Scene {
     const friendlyCenter = { x: 1500, y: mapHeight - 200 };
     const enemyCenter = { x: 1500, y: 200 };
 
+    // Assign a portrait to each player group.
+    const portraitKeys = ['asahina', 'haruhi', 'nagato', 'koizumi', 'kyon'];
+
     // --- Create Friendly Groups ---
     this.playerGroups = [];
     this.playerGroupData = [];
@@ -121,7 +137,7 @@ class PlayScene extends Phaser.Scene {
         maxHp: 15000,
         speed: 50,
         defense: 40,
-        offense: 30,
+        offense: 1000,
         isPlayer: true,
         alive: true,
         targetX: sprite.x,
@@ -129,7 +145,9 @@ class PlayScene extends Phaser.Scene {
         highlight: null,
         waypoint: null,
         waypointLine: null,
-        currentTarget: null
+        currentTarget: null,
+        // Assign a unique portrait image key.
+        portraitKey: portraitKeys[i]
       };
       this.playerGroups.push(dataObj);
       this.playerGroupData.push(dataObj);
@@ -229,7 +247,6 @@ class PlayScene extends Phaser.Scene {
     frame.strokeRect(x, y, width, height);
     frame.fillStyle(0x9FA8C6, 1);
     frame.fillRect(x, y, width, headerHeight);
-    // Create left-aligned label text using Arial Unicode MS.
     let labelText = this.add.text(x + 10, y + headerHeight / 2, label, { 
       fontSize: '14px', 
       color: '#0E121C',
@@ -241,21 +258,16 @@ class PlayScene extends Phaser.Scene {
     this.uiContainer.add(labelText);
   }  
 
-  // createTriangle: Draws the ship group.
-  // - Draws the main triangle and its small detail triangles.
-  // - Adds the vertical Japanese text.
-  // - For enemy ships (0xFF0000), the container is flipped vertically using setScale(0.8, -0.8) so that the triangle is rotated down while the texts are flipped back.
-  // - A live HP counter is added to enemy ships at local y = 30.
-  // - Finally, the ship group is scaled (smaller) overall.
+  // createTriangle: Draws the ship group (triangle with small detail triangles).
   createTriangle(x, y, mainColor, label) {
     const color = mainColor;
     const opacity = 0.6;
     const container = this.add.container(x, y);
     const graphics = this.add.graphics();
 
-    const v1 = { x: 0, y: -40 };   // top vertex
-    const v2 = { x: 25, y: 20 };    // bottom right vertex
-    const v3 = { x: -25, y: 20 };   // bottom left vertex
+    const v1 = { x: 0, y: -40 };
+    const v2 = { x: 25, y: 20 };
+    const v3 = { x: -25, y: 20 };
 
     graphics.fillStyle(color, opacity);
     graphics.beginPath();
@@ -272,7 +284,6 @@ class PlayScene extends Phaser.Scene {
       y: (v1.y + v2.y + v3.y) / 3
     };
 
-    // Top small triangle: flip vertically about its own center.
     function drawSmallTriangleTop(vertex) {
       const D = { x: 0, y: -1 };
       const origApex = { x: vertex.x + D.x * smallTriangleHeight, y: vertex.y + D.y * smallTriangleHeight };
@@ -292,7 +303,6 @@ class PlayScene extends Phaser.Scene {
       graphics.fillPath();
     }
 
-    // Bottom small triangles.
     function drawSmallTriangleAtVertex(vertex) {
       const dir = { x: vertex.x - center.x, y: vertex.y - center.y };
       const mag = Math.sqrt(dir.x * dir.x + dir.y * dir.y);
@@ -324,12 +334,9 @@ class PlayScene extends Phaser.Scene {
     }).setOrigin(0.5);
     container.add(text);
 
-    // For enemy ships, flip the triangle down while keeping texts upright and add an HP counter.
     if (color === 0xff0000) {
-      // Instead of manually flipping scaleY and then overriding with setScale,
-      // we directly set the scale to (0.8, -0.8) so the triangle is flipped and scaled.
       container.setScale(0.8, -0.8);
-      text.scaleY = -1; // Flip the text back to normal.
+      text.scaleY = -1;
       let hpText = this.add.text(0, 30, "15000", {
         fontSize: '10px',
         color: '#ffffff',
@@ -369,7 +376,6 @@ class PlayScene extends Phaser.Scene {
         if (g.highlight) { g.highlight.destroy(); g.highlight = null; }
       });
       this.selectedGroup = clickedGroup;
-      // Create a filled selection circle (radius 60, color 0x92ABFF at 30% opacity)
       clickedGroup.highlight = this.add.graphics();
       clickedGroup.highlight.fillStyle(0x92ABFF, 0.3);
       clickedGroup.highlight.fillCircle(0, 0, 60);
@@ -517,6 +523,15 @@ class PlayScene extends Phaser.Scene {
     if (defender.hp <= 0) {
       defender.hp = 0;
       defender.alive = false;
+
+      // Play explosion sound when a ship is destroyed.
+      this.sound.play('explosion');
+
+      // If a player group destroyed the enemy, show the portrait.
+      if (attacker.isPlayer) {
+        this.showPortrait(attacker.portraitKey);
+      }
+
       defender.sprite.destroy();
       this.checkEndCondition();
     }
@@ -610,6 +625,7 @@ class PlayScene extends Phaser.Scene {
       }
     });
 
+    // Clean up bullet tracers after their lifetime.
     for (let i = this.bulletTracers.length - 1; i >= 0; i--) {
       let tracer = this.bulletTracers[i];
       let elapsed = this.time.now - tracer.startTime;
@@ -633,7 +649,7 @@ class PlayScene extends Phaser.Scene {
 
     // Update enemy HP counters live.
     this.enemyGroups.forEach(enemy => {
-      if (enemy.sprite.hpText) {
+      if (enemy.alive && enemy.sprite && enemy.sprite.hpText) {
         enemy.sprite.hpText.setText(enemy.hp.toString());
       }
     });
@@ -663,7 +679,9 @@ class PlayScene extends Phaser.Scene {
     }
   }
 
+  // Play "spaceAttack" sound each time a bullet tracer is created.
   createBulletTracer(attacker, defender) {
+    this.sound.play('spaceAttack');
     let tracer = {
       graphics: this.add.graphics(),
       attacker: attacker,
@@ -673,5 +691,36 @@ class PlayScene extends Phaser.Scene {
       startTime: this.time.now
     };
     this.bulletTracers.push(tracer);
+  }
+
+  // Show portrait: slide in from the left, hold for 4 seconds, then fade out.
+  showPortrait(portraitKey) {
+    const startX = -200;
+    const centerY = this.game.config.height * 0.5;
+
+    let portrait = this.add.image(startX, centerY, portraitKey);
+    portrait.setScrollFactor(0);
+    portrait.setDepth(9999);
+    portrait.setScale(1.5);
+    portrait.setOrigin(0.5, 1);
+
+    this.tweens.add({
+      targets: portrait,
+      x: 200, // Slide to x=200.
+      duration: 1000,
+      ease: 'Power2',
+      onComplete: () => {
+        this.time.delayedCall(4000, () => {
+          this.tweens.add({
+            targets: portrait,
+            alpha: 0,
+            duration: 1000,
+            onComplete: () => {
+              portrait.destroy();
+            }
+          });
+        });
+      }
+    });
   }
 }
