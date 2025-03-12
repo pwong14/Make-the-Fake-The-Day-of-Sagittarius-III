@@ -21,10 +21,13 @@ class PlayScene extends Phaser.Scene {
   }
 
   create() {
+    // Initialize an array to track active portrait images.
+    this.activePortraits = [];
+
     // Define map dimensions.
     const mapWidth = 3000;
     const mapHeight = 3000;
-    const headerHeight = 20; // Height for the window header
+    const headerHeight = 20;
 
     // Set the physics world bounds.
     this.physics.world.setBounds(0, 0, mapWidth, mapHeight);
@@ -146,7 +149,6 @@ class PlayScene extends Phaser.Scene {
         waypoint: null,
         waypointLine: null,
         currentTarget: null,
-        // Assign a unique portrait image key.
         portraitKey: portraitKeys[i]
       };
       this.playerGroups.push(dataObj);
@@ -168,7 +170,7 @@ class PlayScene extends Phaser.Scene {
         name: (i + 1).toString().padStart(2, '0'),
         hp: 15000,
         maxHp: 15000,
-        speed: 50,
+        speed: 245,
         defense: 40,
         offense: 30,
         isPlayer: false,
@@ -258,7 +260,7 @@ class PlayScene extends Phaser.Scene {
     this.uiContainer.add(labelText);
   }  
 
-  // createTriangle: Draws the ship group (triangle with small detail triangles).
+  // createTriangle: Draws the ship group (a triangle with small detail triangles).
   createTriangle(x, y, mainColor, label) {
     const color = mainColor;
     const opacity = 0.6;
@@ -523,15 +525,10 @@ class PlayScene extends Phaser.Scene {
     if (defender.hp <= 0) {
       defender.hp = 0;
       defender.alive = false;
-
-      // Play explosion sound when a ship is destroyed.
       this.sound.play('explosion');
-
-      // If a player group destroyed the enemy, show the portrait.
       if (attacker.isPlayer) {
         this.showPortrait(attacker.portraitKey);
       }
-
       defender.sprite.destroy();
       this.checkEndCondition();
     }
@@ -625,7 +622,6 @@ class PlayScene extends Phaser.Scene {
       }
     });
 
-    // Clean up bullet tracers after their lifetime.
     for (let i = this.bulletTracers.length - 1; i >= 0; i--) {
       let tracer = this.bulletTracers[i];
       let elapsed = this.time.now - tracer.startTime;
@@ -647,7 +643,6 @@ class PlayScene extends Phaser.Scene {
       }
     }
 
-    // Update enemy HP counters live.
     this.enemyGroups.forEach(enemy => {
       if (enemy.alive && enemy.sprite && enemy.sprite.hpText) {
         enemy.sprite.hpText.setText(enemy.hp.toString());
@@ -693,20 +688,40 @@ class PlayScene extends Phaser.Scene {
     this.bulletTracers.push(tracer);
   }
 
-  // Show portrait: slide in from the left, hold for 4 seconds, then fade out.
+  // Show portrait on main map only: slide in from the left, hold for 4 seconds, then fade out.
   showPortrait(portraitKey) {
+    // Fade out any currently active portraits.
+    if (this.activePortraits && this.activePortraits.length > 0) {
+      this.activePortraits.forEach(portrait => {
+        this.tweens.add({
+          targets: portrait,
+          alpha: 0,
+          duration: 300,
+          onComplete: () => {
+            portrait.destroy();
+          }
+        });
+      });
+      this.activePortraits = [];
+    }
+    
     const startX = -200;
-    const centerY = this.game.config.height * 0.5;
-
-    let portrait = this.add.image(startX, centerY, portraitKey);
+    const bottomY = this.game.config.height; // Align bottom
+    let portrait = this.add.image(startX, bottomY, portraitKey);
     portrait.setScrollFactor(0);
     portrait.setDepth(9999);
-    portrait.setScale(1.5);
+    portrait.setScale(0.75);
     portrait.setOrigin(0.5, 1);
+
+    // Exclude portrait from the minimap and UI cameras.
+    this.minimapCamera.ignore(portrait);
+    this.uiCamera.ignore(portrait);
+    
+    this.activePortraits.push(portrait);
 
     this.tweens.add({
       targets: portrait,
-      x: 200, // Slide to x=200.
+      x: 350, // Slide in to x=200.
       duration: 1000,
       ease: 'Power2',
       onComplete: () => {
@@ -717,6 +732,10 @@ class PlayScene extends Phaser.Scene {
             duration: 1000,
             onComplete: () => {
               portrait.destroy();
+              const index = this.activePortraits.indexOf(portrait);
+              if (index !== -1) {
+                this.activePortraits.splice(index, 1);
+              }
             }
           });
         });
