@@ -51,6 +51,51 @@ class PlayScene extends Phaser.Scene {
     this.minimapCamera.ignore(this.uiContainer);
     this.uiCamera.ignore(this.gameObjectsContainer);
 
+    // --- Add Speed Control Buttons (top left) ---
+    this.speedButtons = {};
+    // Button for 1x speed.
+    this.speedButtons.oneX = this.add.text(10, 10, '1x', { 
+      fontSize: '20px', 
+      color: '#ffffff',
+      backgroundColor: '#000000'
+    });
+    this.speedButtons.oneX.setPadding(5);
+    this.speedButtons.oneX.setInteractive();
+    this.speedButtons.oneX.on('pointerdown', () => {
+      this.setGameSpeed(1);
+    });
+    
+    // Button for 2x speed.
+    this.speedButtons.twoX = this.add.text(70, 10, '2x', { 
+      fontSize: '20px', 
+      color: '#ffffff',
+      backgroundColor: '#000000'
+    });
+    this.speedButtons.twoX.setPadding(5);
+    this.speedButtons.twoX.setInteractive();
+    this.speedButtons.twoX.on('pointerdown', () => {
+      this.setGameSpeed(2);
+    });
+    
+    // Button for 3x speed.
+    this.speedButtons.threeX = this.add.text(130, 10, '3x', { 
+      fontSize: '20px', 
+      color: '#ffffff',
+      backgroundColor: '#000000'
+    });
+    this.speedButtons.threeX.setPadding(5);
+    this.speedButtons.threeX.setInteractive();
+    this.speedButtons.threeX.on('pointerdown', () => {
+      this.setGameSpeed(3);
+    });
+    
+    // Add the speed buttons to the UI container so they remain fixed.
+    this.uiContainer.add([
+      this.speedButtons.oneX,
+      this.speedButtons.twoX,
+      this.speedButtons.threeX
+    ]);
+    
     // --- Draw the Grid Background for Main Map ---
     let gridGraphics = this.add.graphics();
     gridGraphics.fillStyle(0x0E121C, 1);
@@ -140,7 +185,7 @@ class PlayScene extends Phaser.Scene {
         maxHp: 15000,
         speed: 50,
         defense: 40,
-        offense: 1000,
+        offense: 30,
         isPlayer: true,
         alive: true,
         targetX: sprite.x,
@@ -170,7 +215,7 @@ class PlayScene extends Phaser.Scene {
         name: (i + 1).toString().padStart(2, '0'),
         hp: 15000,
         maxHp: 15000,
-        speed: 245,
+        speed: 50,
         defense: 40,
         offense: 30,
         isPlayer: false,
@@ -233,6 +278,16 @@ class PlayScene extends Phaser.Scene {
     this.overlayContainer.setDepth(1000);
 
     this.updateConditionUI();
+    
+    // Set default game speed to 1x.
+    this.setGameSpeed(1);
+  }
+
+  // Helper method to set the overall game speed.
+  setGameSpeed(speed) {
+    this.physics.world.timeScale = speed;
+    this.time.timeScale = speed;
+    this.tweens.timeScale = speed;
   }
 
   // Helper: Draw a window frame.
@@ -721,7 +776,7 @@ class PlayScene extends Phaser.Scene {
 
     this.tweens.add({
       targets: portrait,
-      x: 350, // Slide in to x=200.
+      x: 350, // Slide in to x=350.
       duration: 1000,
       ease: 'Power2',
       onComplete: () => {
