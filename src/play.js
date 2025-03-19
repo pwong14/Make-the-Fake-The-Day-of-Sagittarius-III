@@ -40,7 +40,7 @@ class PlayScene extends Phaser.Scene {
     // Cameras
     this.mainCamera = this.cameras.main.setBounds(0, 0, mapWidth, mapHeight).setZoom(1.5);
     this.uiCamera   = this.cameras.add(0, 0, this.game.config.width, this.game.config.height).setScroll(0, 0);
-    this.minimapCamera = this.cameras.add(960, 400, 320, 320).setBounds(0, 0, mapWidth, mapHeight).setZoom(320/mapWidth);
+    this.minimapCamera = this.cameras.add(960, 400, 320, 320).setBounds(0, 0, mapWidth, mapHeight).setZoom(320 / mapWidth);
 
     // Containers
     this.gameObjectsContainer = this.add.container(0, 0);
@@ -49,21 +49,24 @@ class PlayScene extends Phaser.Scene {
     // Exclude UI from main & minimap
     this.mainCamera.ignore(this.uiContainer);
     this.minimapCamera.ignore(this.uiContainer);
+    // Exclude game objects from the UI camera
     this.uiCamera.ignore(this.gameObjectsContainer);
 
-    // --- Speed Buttons ---
+    // Speed Buttons
     const buttonY = 50;
     this.speedButtons = {};
     this.highlightButton = (btn) => {
       this.speedButtons.oneX.setStyle({ backgroundColor: '#000000' });
       this.speedButtons.twoX.setStyle({ backgroundColor: '#000000' });
       this.speedButtons.threeX.setStyle({ backgroundColor: '#000000' });
-      if (btn) btn.setStyle({ backgroundColor: '#444444' });
+      if (btn) {
+        btn.setStyle({ backgroundColor: '#444444' });
+      }
     };
 
     // 1x speed
     this.speedButtons.oneX = this.add.text(10, buttonY, '1x', {
-      fontSize: '20px', color: '#ffffff', backgroundColor: '#000000'
+      fontSize:'20px', color:'#ffffff', backgroundColor:'#000000'
     })
       .setPadding(5).setInteractive()
       .on('pointerdown', () => {
@@ -75,7 +78,7 @@ class PlayScene extends Phaser.Scene {
 
     // 2x speed
     this.speedButtons.twoX = this.add.text(70, buttonY, '2x', {
-      fontSize: '20px', color: '#ffffff', backgroundColor: '#000000'
+      fontSize:'20px', color:'#ffffff', backgroundColor:'#000000'
     })
       .setPadding(5).setInteractive()
       .on('pointerdown', () => {
@@ -87,7 +90,7 @@ class PlayScene extends Phaser.Scene {
 
     // 3x speed
     this.speedButtons.threeX = this.add.text(130, buttonY, '3x', {
-      fontSize: '20px', color: '#ffffff', backgroundColor: '#000000'
+      fontSize:'20px', color:'#ffffff', backgroundColor:'#000000'
     })
       .setPadding(5).setInteractive()
       .on('pointerdown', () => {
@@ -103,15 +106,15 @@ class PlayScene extends Phaser.Scene {
       this.speedButtons.threeX
     ]);
 
-    // Grid
+    // Draw Grid
     let gridGraphics = this.add.graphics();
     gridGraphics.fillStyle(0x0E121C, 1).fillRect(0, 0, mapWidth, mapHeight);
     gridGraphics.lineStyle(1, 0x444444, 1);
-    for (let x = 0; x <= mapWidth; x += 50) {
-      gridGraphics.beginPath().moveTo(x, 0).lineTo(x, mapHeight).strokePath();
+    for (let x=0; x<=mapWidth; x+=50) {
+      gridGraphics.beginPath().moveTo(x,0).lineTo(x,mapHeight).strokePath();
     }
-    for (let y = 0; y <= mapHeight; y += 50) {
-      gridGraphics.beginPath().moveTo(0, y).lineTo(mapWidth, y).strokePath();
+    for (let y=0; y<=mapHeight; y+=50) {
+      gridGraphics.beginPath().moveTo(0,y).lineTo(mapWidth,y).strokePath();
     }
     this.gameObjectsContainer.add(gridGraphics);
 
@@ -121,7 +124,7 @@ class PlayScene extends Phaser.Scene {
     this.drawWindowFrame(960, 150, 320, 220, "CONDITION OF YOUR SIDE", 0x192743);
     this.drawWindowFrame(960, 370, 320, 350, "LOCATION", 0x0E121C);
 
-    // Input
+    // Input Handling
     this.draggingCamera = false;
     this.input.mouse.disableContextMenu();
     this.input.on('pointerdown', (pointer) => {
@@ -153,47 +156,45 @@ class PlayScene extends Phaser.Scene {
       }
     });
 
-    // Setup formations
+    // Formation
     const formationOffsets = [
-      { x:-100, y:-100 },
-      { x:100,  y:-100 },
-      { x:-100, y:100  },
-      { x:100,  y:100  },
-      { x:0,    y:0    }
+      { x:-100,y:-100 },
+      { x:100, y:-100 },
+      { x:-100,y:100  },
+      { x:100, y:100  },
+      { x:0,   y:0    }
     ];
-    const friendlyCenter = { x:1500, y:mapHeight - 200 };
-    const enemyCenter    = { x:1500, y:200 };
+    const friendlyCenter = { x:1500, y: mapHeight-200 };
+    const enemyCenter = { x:1500, y: 200 };
 
     // Create Player Groups
     this.playerGroups = [];
     this.playerGroupData = [];
-    for (let i=0; i<formationOffsets.length; i++){
-      let pos={
+    for (let i=0; i<formationOffsets.length; i++) {
+      let pos = {
         x: friendlyCenter.x + formationOffsets[i].x,
         y: friendlyCenter.y + formationOffsets[i].y
       };
-      // Name them "01","02","03","04","05"
       let shipName = (i+1).toString().padStart(2,'0');
       let sprite = this.createTriangle(pos.x, pos.y, 0x00ff00, shipName);
-
       this.gameObjectsContainer.add(sprite);
 
-      let dataObj={
+      let dataObj = {
         sprite,
         name: shipName,
-        hp:15000,
-        maxHp:15000,
-        speed:50,
-        defense:40,
-        offense:120,
-        isPlayer:true,
-        alive:true,
+        hp: 15000,
+        maxHp: 15000,
+        speed: 50,
+        defense: 40,
+        offense: 120,
+        isPlayer: true,
+        alive: true,
         targetX: sprite.x,
         targetY: sprite.y,
-        highlight:null,
-        waypoint:null,
-        waypointLine:null,
-        currentTarget:null,
+        highlight: null,
+        waypoint: null,
+        waypointLine: null,
+        currentTarget: null,
         portraitKey: ['asahina','haruhi','nagato','koizumi','kyon'][i]
       };
       this.playerGroups.push(dataObj);
@@ -203,35 +204,37 @@ class PlayScene extends Phaser.Scene {
     // Create Enemy Groups
     this.enemyGroups = [];
     for (let i=0; i<formationOffsets.length; i++){
-      let pos={
+      let pos = {
         x: enemyCenter.x + formationOffsets[i].x,
         y: enemyCenter.y + formationOffsets[i].y
       };
       let enemyName = (i+1).toString().padStart(2,'0');
-      let sprite = this.createTriangle(pos.x,pos.y,0xff0000, enemyName);
+      let sprite = this.createTriangle(pos.x, pos.y, 0xff0000, enemyName);
       this.gameObjectsContainer.add(sprite);
 
-      let dataObj={
+      let dataObj = {
         sprite,
-        name:enemyName,
-        hp:15000,
-        maxHp:15000,
-        speed:50,
-        defense:40,
-        offense:120,
-        isPlayer:false,
-        alive:true,
-        targetX:sprite.x,
-        targetY:sprite.y,
-        currentTarget:null
+        name: enemyName,
+        hp: 15000,
+        maxHp: 15000,
+        speed: 50,
+        defense: 40,
+        offense: 120,
+        isPlayer: false,
+        alive: true,
+        targetX: sprite.x,
+        targetY: sprite.y,
+        currentTarget: null
       };
       this.enemyGroups.push(dataObj);
     }
 
     // Colliders
     this.allShipSprites=[];
-    this.playerGroups.forEach(g=>this.allShipSprites.push(g.sprite));
-    this.enemyGroups.forEach(g=>this.allShipSprites.push(g.sprite));
+    this.playerGroups.forEach(g => this.allShipSprites.push(g.sprite));
+    this.enemyGroups.forEach(g => this.allShipSprites.push(g.sprite));
+
+    // For each pair, add a collider
     for(let i=0; i<this.allShipSprites.length; i++){
       for(let j=i+1; j<this.allShipSprites.length; j++){
         this.physics.add.collider(this.allShipSprites[i], this.allShipSprites[j]);
@@ -241,32 +244,41 @@ class PlayScene extends Phaser.Scene {
     this.mainCamera.centerOn(friendlyCenter.x, friendlyCenter.y);
 
     // Timers
+    //  - checkCombat every 0.5s
     this.time.addEvent({ delay:500, callback:()=>this.checkCombat(), loop:true });
-    this.time.addEvent({ delay:1000,callback:()=>this.updateEnemyAI(), loop:true });
+    //  - updateEnemyAI every 1s
+    this.time.addEvent({ delay:1000, callback:()=>this.updateEnemyAI(), loop:true });
 
     // UI
-    this.selectedInfoText = this.add.text(970, 40, "NO FLEET SELECTED", { fontSize:'16px', color:'#ffffff'});
+    this.selectedInfoText = this.add.text(970, 40, "NO FLEET SELECTED", {
+      fontSize:'16px', color:'#ffffff'
+    });
     this.uiContainer.add(this.selectedInfoText);
 
     this.conditionLines=[];
     for(let i=0; i<5; i++){
-      let line=this.add.text(970, 190 + i*20, "", { fontSize:'16px', color:'#ffffff'});
+      let line=this.add.text(970, 190 + i*20, "", {
+        fontSize:'16px', color:'#ffffff'
+      });
       this.conditionLines.push(line);
       this.uiContainer.add(line);
     }
 
     // Minimap overlay
-    this.overlayContainer=this.add.container(0,0);
+    this.overlayContainer = this.add.container(0,0);
     this.mainCamera.ignore(this.overlayContainer);
     this.uiCamera.ignore(this.overlayContainer);
     this.minimapCamera.ignore(this.overlayContainer);
-    this.minimapOverlay=this.add.graphics();
+    this.minimapOverlay = this.add.graphics();
     this.overlayContainer.add(this.minimapOverlay);
     this.overlayContainer.setDepth(1000);
 
     this.updateConditionUI();
   }
 
+  /**
+   * drawWindowFrame ...
+   */
   drawWindowFrame(x, y, width, height, label, bgColor) {
     const headerHeight=20;
     if(label==="STATUS"||label==="CONDITION OF YOUR SIDE"){
@@ -285,44 +297,39 @@ class PlayScene extends Phaser.Scene {
   }
 
   /**
-   * createTriangle: bigger click area for friendly ships, immovable for friend so enemies can’t push them.
+   * createTriangle:
+   *  - set a circular body so ships never overlap
+   *  - immovable if friendly, bigger circle if friendly
    */
   createTriangle(x, y, mainColor, shipName) {
     const color = mainColor;
-    const opacity=0.6;
-    const container=this.add.container(x,y);
-    const graphics=this.add.graphics();
+    const container = this.add.container(x,y);
+    const graphics = this.add.graphics();
 
+    // Triangular shape
     const v1={ x:0,  y:-40 };
-    const v2={ x:25, y: 20 };
-    const v3={ x:-25,y: 20 };
-
-    graphics.fillStyle(color,opacity);
+    const v2={ x:25, y:20  };
+    const v3={ x:-25,y:20  };
+    graphics.fillStyle(color, 0.6);
     graphics.beginPath();
-    graphics.moveTo(v1.x,v1.y);
-    graphics.lineTo(v2.x,v2.y);
-    graphics.lineTo(v3.x,v3.y);
+    graphics.moveTo(v1.x, v1.y);
+    graphics.lineTo(v2.x, v2.y);
+    graphics.lineTo(v3.x, v3.y);
     graphics.closePath();
     graphics.fillPath();
 
-    // Extra detail triangles
-    // [snip same logic as original for brevity, or keep if you prefer…]
-    // ...
-
     container.add(graphics);
 
-    // numeric shipName
-    const text=this.add.text(0,0,shipName,{
+    // label
+    const text = this.add.text(0,0,shipName, {
       fontSize:'10px', color:'#ffffff', align:'center'
     }).setOrigin(0.5);
     container.add(text);
 
     if(color===0xff0000){
-      // enemy => flip up
       container.setScale(0.8, -0.8);
       text.scaleY=-1;
-
-      let hpText = this.add.text(0,30,"15000",{
+      let hpText=this.add.text(0,30,"15000",{
         fontSize:'10px', color:'#ffffff', align:'center'
       });
       hpText.setOrigin(0.5,1);
@@ -330,28 +337,35 @@ class PlayScene extends Phaser.Scene {
       container.add(hpText);
       container.hpText=hpText;
     } else {
-      // friendly => face down
       container.setScale(0.8);
     }
 
     // Add physics
     this.physics.add.existing(container);
 
-    // (CHANGED) If friendly => bigger bounding box + immovable
+    // (IMPORTANT) set a circular body so they never overlap
+    // We'll define radius 40 for friend (bigger circle) and radius 25 for enemy
     if(color===0x00ff00){
-      container.setSize(80,80);  // bigger click area
-      container.body.setImmovable(true); // friend immovable => enemies can't push them
+      // friendly => bigger circle, immovable
+      container.body.setCircle(40); 
+      container.body.setOffset(-40, -40);
+      container.body.setImmovable(true);
     } else {
-      container.setSize(50,50); // default for enemy
-      container.body.setImmovable(false); // enemy is pushable
+      // enemy => smaller circle
+      container.body.setCircle(25);
+      container.body.setOffset(-25, -25);
+      container.body.setImmovable(false);
     }
 
-    container.setInteractive(new Phaser.Geom.Rectangle(-40,-40,80,80), Phaser.Geom.Rectangle.Contains);
+    // still allow a bigger click area for friendly
+    if(color===0x00ff00){
+      container.setInteractive(new Phaser.Geom.Circle(0, 0, 60), Phaser.Geom.Circle.Contains);
+    } else {
+      container.setInteractive(new Phaser.Geom.Circle(0, 0, 30), Phaser.Geom.Circle.Contains);
+    }
 
-    container.body.setCollideWorldBounds(true).setOffset(-40,-40);
-
-    // reduce bounce
-    container.body.setBounce(0.02);
+    // bounce=0 => no overlap
+    container.body.setBounce(0);
     container.body.setDamping(true);
     container.body.setDrag(0.95);
 
@@ -363,10 +377,13 @@ class PlayScene extends Phaser.Scene {
     let clickedGroup=null;
     for(let grp of this.playerGroups){
       if(!grp.alive) continue;
+
+      // For a circle body approach, getBounds() might not reflect the circle shape
+      // But we can still do a bounding box check for quick test
       const bounds=grp.sprite.getBounds();
-      // Check bounding box
       if(Phaser.Geom.Rectangle.Contains(bounds, worldPoint.x, worldPoint.y)){
-        clickedGroup=grp; break;
+        clickedGroup=grp; 
+        break;
       }
     }
     if(clickedGroup){
@@ -389,15 +406,22 @@ class PlayScene extends Phaser.Scene {
     }
   }
 
-  moveGroupTo(group,x,y){
-    group.targetX=x; group.targetY=y;
-    this.physics.moveTo(group.sprite,x,y,group.speed);
+  moveGroupTo(group, x, y){
+    group.targetX=x;
+    group.targetY=y;
+    this.physics.moveTo(group.sprite, x, y, group.speed);
 
-    if(group.waypoint){ group.waypoint.destroy(); group.waypoint=null; }
-    if(group.waypointLine){ group.waypointLine.destroy(); group.waypointLine=null; }
+    if(group.waypoint){
+      group.waypoint.destroy();
+      group.waypoint=null;
+    }
+    if(group.waypointLine){
+      group.waypointLine.destroy();
+      group.waypointLine=null;
+    }
 
     group.waypoint=this.add.graphics();
-    group.waypoint.fillStyle(0xffff00,1).fillTriangle(x-10,y,x+10,y,x,y+15);
+    group.waypoint.fillStyle(0xffff00,1).fillTriangle(x-10,y, x+10,y, x,y+15);
 
     group.waypointLine=this.add.graphics().lineStyle(2,0xffff00,1).beginPath();
     group.waypointLine.moveTo(group.sprite.x,group.sprite.y).lineTo(x,y).strokePath();
@@ -423,7 +447,7 @@ class PlayScene extends Phaser.Scene {
   }
 
   updateEnemyAI(){
-    // same logic as your code
+    // same logic
     for(let enemy of this.enemyGroups){
       if(!enemy.alive) continue;
       let nearest=null;
@@ -448,20 +472,22 @@ class PlayScene extends Phaser.Scene {
   }
 
   checkCombat(){
-    // This ensures ships do fire at range < 200
-    // Player side
+    // same logic
+    // [your existing code: ships check for dist<200 => dealDamage => createBulletProjectile]
+    // ...
+    // 1) Player side
     this.playerGroups.forEach(player=>{
       if(!player.alive) return;
       if(player.currentTarget && player.currentTarget.alive){
         let dist=Phaser.Math.Distance.Between(player.sprite.x, player.sprite.y, player.currentTarget.sprite.x, player.currentTarget.sprite.y);
         if(dist<200){
-          const color= (player.isPlayer) ? 0x00ff00 : 0xff0000;
+          const color=0x00ff00;
           this.dealDamage(player, player.currentTarget);
           this.createBulletProjectile(player, player.currentTarget, color);
           return;
         }
       }
-      let closest=null; let minDist=Infinity;
+      let closest=null, minDist=Infinity;
       this.enemyGroups.forEach(enemy=>{
         if(!enemy.alive) return;
         let dist=Phaser.Math.Distance.Between(player.sprite.x, player.sprite.y, enemy.sprite.x, enemy.sprite.y);
@@ -471,25 +497,23 @@ class PlayScene extends Phaser.Scene {
       });
       player.currentTarget=closest;
       if(closest){
-        const color=(player.isPlayer)?0x00ff00:0xff0000;
         this.dealDamage(player, closest);
-        this.createBulletProjectile(player, closest, color);
+        this.createBulletProjectile(player, closest, 0x00ff00);
       }
     });
 
-    // Enemy side
+    // 2) Enemy side
     this.enemyGroups.forEach(enemy=>{
       if(!enemy.alive) return;
       if(enemy.currentTarget && enemy.currentTarget.alive){
         let dist=Phaser.Math.Distance.Between(enemy.sprite.x, enemy.sprite.y, enemy.currentTarget.sprite.x, enemy.currentTarget.sprite.y);
         if(dist<200){
-          const color=(enemy.isPlayer)?0x00ff00:0xff0000;
           this.dealDamage(enemy, enemy.currentTarget);
-          this.createBulletProjectile(enemy, enemy.currentTarget, color);
+          this.createBulletProjectile(enemy, enemy.currentTarget, 0xff0000);
           return;
         }
       }
-      let closest=null; let minDist=Infinity;
+      let closest=null, minDist=Infinity;
       this.playerGroups.forEach(player=>{
         if(!player.alive) return;
         let dist=Phaser.Math.Distance.Between(enemy.sprite.x, enemy.sprite.y, player.sprite.x, player.sprite.y);
@@ -499,9 +523,8 @@ class PlayScene extends Phaser.Scene {
       });
       enemy.currentTarget=closest;
       if(closest){
-        const color=(enemy.isPlayer)?0x00ff00:0xff0000;
         this.dealDamage(enemy, closest);
-        this.createBulletProjectile(enemy, closest, color);
+        this.createBulletProjectile(enemy, closest, 0xff0000);
       }
     });
   }
@@ -517,9 +540,15 @@ class PlayScene extends Phaser.Scene {
       this.sound.play('explosion',{volume:0.1});
       this.createFancyExplosion(defender.sprite.x, defender.sprite.y);
 
+      // If attacker is a player => show portrait
       if(attacker.isPlayer){
         this.showPortrait(attacker.portraitKey);
       }
+      // If the defender was also a player => show that portrait
+      if(defender.isPlayer){
+        this.showPortrait(defender.portraitKey);
+      }
+
       defender.sprite.destroy();
       this.checkEndCondition();
     }
@@ -537,9 +566,9 @@ class PlayScene extends Phaser.Scene {
     let playerAliveCount=this.playerGroups.filter(g=>g.alive).length;
     let enemyAliveCount=this.enemyGroups.filter(g=>g.alive).length;
     if(playerAliveCount===0){
-      this.scene.start('EndScene',{ result:'lose', level:this.selectedLevel });
+      this.scene.start('EndScene',{result:'lose', level:this.selectedLevel});
     } else if(enemyAliveCount===0){
-      this.scene.start('EndScene',{ result:'win',  level:this.selectedLevel });
+      this.scene.start('EndScene',{result:'win',  level:this.selectedLevel});
     }
   }
 
@@ -552,17 +581,19 @@ class PlayScene extends Phaser.Scene {
     const endX=defender.sprite.x;
     const endY=defender.sprite.y;
 
-    let bulletGfx=this.add.graphics({ x:startX, y:startY });
+    let bulletGfx=this.add.graphics({x:startX, y:startY});
     bulletGfx.lineStyle(2,color,1);
 
     const dx=endX-startX;
     const dy=endY-startY;
 
     let paramObj={progress:0};
+
+    // faster bullet => short tween
     this.tweens.add({
-      targets:paramObj,
+      targets: paramObj,
       progress:1,
-      duration:200,
+      duration:100,
       onUpdate:()=>{
         bulletGfx.clear();
         bulletGfx.lineStyle(3,color,1);
@@ -709,7 +740,7 @@ class PlayScene extends Phaser.Scene {
   update(){
     // Stop near target
     [...this.playerGroups,...this.enemyGroups].forEach(group=>{
-      if(!group.alive) return;
+      if(!group.alive)return;
       const dx=group.targetX-group.sprite.x;
       const dy=group.targetY-group.sprite.y;
       if(Math.sqrt(dx*dx+dy*dy)<4){
@@ -718,8 +749,8 @@ class PlayScene extends Phaser.Scene {
     });
 
     // Update enemy HP text in real-time
-    this.enemyGroups.forEach(enemy => {
-      if(enemy.alive && enemy.sprite && enemy.sprite.hpText) {
+    this.enemyGroups.forEach(enemy=>{
+      if(enemy.alive && enemy.sprite && enemy.sprite.hpText){
         enemy.sprite.hpText.setText(enemy.hp.toString());
       }
     });
@@ -749,8 +780,8 @@ class PlayScene extends Phaser.Scene {
       const dy=group.targetY-group.sprite.y;
       const dist=Math.sqrt(dx*dx+dy*dy);
       if(dist<4){
-        if(group.waypoint){ group.waypoint.destroy(); group.waypoint=null;}
-        if(group.waypointLine){ group.waypointLine.destroy(); group.waypointLine=null;}
+        if(group.waypoint){ group.waypoint.destroy(); group.waypoint=null; }
+        if(group.waypointLine){ group.waypointLine.destroy(); group.waypointLine=null; }
       } else if(group.waypointLine){
         group.waypointLine.clear().lineStyle(2,0xffff00,1).beginPath();
         group.waypointLine.moveTo(group.sprite.x,group.sprite.y);
@@ -806,11 +837,12 @@ class PlayScene extends Phaser.Scene {
       duration:1000,
       ease:'Power2',
       onComplete:()=>{
-        this.time.delayedCall(4000,()=>{
+        // fade out sooner & faster
+        this.time.delayedCall(2000,()=>{
           this.tweens.add({
             targets:portrait,
             alpha:0,
-            duration:1000,
+            duration:300,
             onComplete:()=>{
               portrait.destroy();
               const idx=this.activePortraits.indexOf(portrait);
