@@ -8,7 +8,7 @@ class PlayScene extends Phaser.Scene {
     this.load.audio('explosion', 'assets/explosion.mp3');
     this.load.audio('spaceAttack', 'assets/spaceAttack.mp3');
 
-    // Load portrait images.
+    // Load portrait images
     this.load.image('asahina', 'assets/asahina.png');
     this.load.image('haruhi', 'assets/haruhi.png');
     this.load.image('nagato', 'assets/nagato.png');
@@ -21,82 +21,166 @@ class PlayScene extends Phaser.Scene {
   }
 
   create() {
-    // Initialize an array to track active portrait images.
+    // Track active portrait images
     this.activePortraits = [];
 
-    // Define map dimensions.
+    // Map dimensions
     const mapWidth = 3000;
     const mapHeight = 3000;
-    const headerHeight = 20;
 
-    // Set the physics world bounds.
+    // Set physics bounds
     this.physics.world.setBounds(0, 0, mapWidth, mapHeight);
 
-    // --- Create Cameras ---
+    // Disable fixed-step so timeScale changes actually speed/slow the game
+    this.physics.world.useFixedStep = false;
+
+    // Cameras
     this.mainCamera = this.cameras.main;
     this.mainCamera.setBounds(0, 0, mapWidth, mapHeight);
     this.mainCamera.setZoom(1.5);
 
-    this.uiCamera = this.cameras.add(0, 0, this.game.config.width, this.game.config.height);
-    this.uiCamera.setScroll(0, 0);
+    this.uiCamera = this.cameras.add(0, 0, this.game.config.width, this.game.config.height).setScroll(0, 0);
 
     this.minimapCamera = this.cameras.add(960, 400, 320, 320);
     this.minimapCamera.setBounds(0, 0, mapWidth, mapHeight);
     this.minimapCamera.setZoom(320 / mapWidth);
 
-    // --- Create Containers ---
+    // Containers
     this.gameObjectsContainer = this.add.container(0, 0);
     this.uiContainer = this.add.container(0, 0);
     this.mainCamera.ignore(this.uiContainer);
     this.minimapCamera.ignore(this.uiContainer);
     this.uiCamera.ignore(this.gameObjectsContainer);
 
-    // --- Add Speed Control Buttons (top left) ---
+    // --- Add Play/Pause + Speed Buttons ---
+    // Move them down so they don't clip window labels
+    const buttonY = 50;
+
+    // Track whether game is paused
+    this.isPaused = false;
+    // Track which button is currently highlighted
+    this.currentlyHighlighted = null;
+
+    // A simple usage flag for each button, so it can only be pressed once:
+    this.buttonsUsed = {
+      pause: false,
+      oneX: false,
+      twoX: false,
+      threeX: false
+    };
+
+    // Helper to highlight exactly one button
+    this.highlightButton = (btn) => {
+      // Reset all button backgrounds to black
+      this.playPauseButton.setStyle({ backgroundColor: '#000000' });
+      this.speedButtons.oneX.setStyle({ backgroundColor: '#000000' });
+      this.speedButtons.twoX.setStyle({ backgroundColor: '#000000' });
+      this.speedButtons.threeX.setStyle({ backgroundColor: '#000000' });
+
+      // If there's a specific button, highlight it
+      if (btn) {
+        btn.setStyle({ backgroundColor: '#444444' });
+      }
+      this.currentlyHighlighted = btn || null;
+    };
+
+    // Create the pause button
+    this.playPauseButton = this.add.text(10, buttonY, '❚❚', {
+      fontSize: '20px',
+      color: '#ffffff',
+      backgroundColor: '#000000'
+    }).setPadding(5).setInteractive();
+
+    // Pause button: only can be pressed once
+    this.playPauseButton.on('pointerdown', () => {
+      if (this.buttonsUsed.pause) return; // Already used it, do nothing
+      // Mark as used
+      this.buttonsUsed.pause = true;
+      // Pause the game
+      this.isPaused = true;
+      // Set all time scales to 0
+      this.physics.world.timeScale = 0;
+      this.time.timeScale = 0;
+      this.tweens.timeScale = 0;
+      // Highlight pause button
+      this.highlightButton(this.playPauseButton);
+      // Disable interactive so we can't press it again
+      this.playPauseButton.disableInteractive();
+    });
+
+    // Speed buttons
     this.speedButtons = {};
-    // Button for 1x speed.
-    this.speedButtons.oneX = this.add.text(10, 10, '1x', { 
-      fontSize: '20px', 
+
+    // 1x
+    this.speedButtons.oneX = this.add.text(70, buttonY, '1x', {
+      fontSize: '20px',
       color: '#ffffff',
       backgroundColor: '#000000'
-    });
-    this.speedButtons.oneX.setPadding(5);
-    this.speedButtons.oneX.setInteractive();
+    }).setPadding(5).setInteractive();
+
     this.speedButtons.oneX.on('pointerdown', () => {
-      this.setGameSpeed(1);
+      if (this.buttonsUsed.oneX) return; // Already used once
+      // Mark as used
+      this.buttonsUsed.oneX = true;
+      // If paused, unpause
+      this.isPaused = false;
+      // Set speeds
+      this.physics.world.timeScale = 1;
+      this.time.timeScale = 1;
+      this.tweens.timeScale = 1;
+      // Highlight the button
+      this.highlightButton(this.speedButtons.oneX);
+      // Disable this button so we can't press it again
+      this.speedButtons.oneX.disableInteractive();
     });
-    
-    // Button for 2x speed.
-    this.speedButtons.twoX = this.add.text(70, 10, '2x', { 
-      fontSize: '20px', 
+
+    // 2x (in your code, it's actually 0.6)
+    this.speedButtons.twoX = this.add.text(130, buttonY, '2x', {
+      fontSize: '20px',
       color: '#ffffff',
       backgroundColor: '#000000'
-    });
-    this.speedButtons.twoX.setPadding(5);
-    this.speedButtons.twoX.setInteractive();
+    }).setPadding(5).setInteractive();
+
     this.speedButtons.twoX.on('pointerdown', () => {
-      this.setGameSpeed(2);
+      if (this.buttonsUsed.twoX) return; 
+      this.buttonsUsed.twoX = true;
+      this.isPaused = false;
+      // "2x" in your code is 0.6 timeScale
+      this.physics.world.timeScale = 0.6;
+      this.time.timeScale = 0.6;
+      this.tweens.timeScale = 0.6;
+      this.highlightButton(this.speedButtons.twoX);
+      this.speedButtons.twoX.disableInteractive();
     });
-    
-    // Button for 3x speed.
-    this.speedButtons.threeX = this.add.text(130, 10, '3x', { 
-      fontSize: '20px', 
+
+    // 3x (in your code, actually 0.3)
+    this.speedButtons.threeX = this.add.text(190, buttonY, '3x', {
+      fontSize: '20px',
       color: '#ffffff',
       backgroundColor: '#000000'
-    });
-    this.speedButtons.threeX.setPadding(5);
-    this.speedButtons.threeX.setInteractive();
+    }).setPadding(5).setInteractive();
+
     this.speedButtons.threeX.on('pointerdown', () => {
-      this.setGameSpeed(3);
+      if (this.buttonsUsed.threeX) return;
+      this.buttonsUsed.threeX = true;
+      this.isPaused = false;
+      // "3x" is 0.3 in your code
+      this.physics.world.timeScale = 0.3;
+      this.time.timeScale = 0.3;
+      this.tweens.timeScale = 0.3;
+      this.highlightButton(this.speedButtons.threeX);
+      this.speedButtons.threeX.disableInteractive();
     });
-    
-    // Add the speed buttons to the UI container so they remain fixed.
+
+    // Add all to UI container
     this.uiContainer.add([
+      this.playPauseButton,
       this.speedButtons.oneX,
       this.speedButtons.twoX,
       this.speedButtons.threeX
     ]);
-    
-    // --- Draw the Grid Background for Main Map ---
+
+    // --- Draw the grid background ---
     let gridGraphics = this.add.graphics();
     gridGraphics.fillStyle(0x0E121C, 1);
     gridGraphics.fillRect(0, 0, mapWidth, mapHeight);
@@ -121,7 +205,7 @@ class PlayScene extends Phaser.Scene {
     this.drawWindowFrame(960, 150, 320, 220, "CONDITION OF YOUR SIDE", 0x192743);
     this.drawWindowFrame(960, 370, 320, 350, "LOCATION", 0x0E121C);
 
-    // --- Input Handling ---
+    // Input handling
     this.draggingCamera = false;
     this.input.mouse.disableContextMenu();
     this.input.on('pointerdown', (pointer) => {
@@ -153,7 +237,7 @@ class PlayScene extends Phaser.Scene {
       }
     });
 
-    // --- Formation Definitions ---
+    // Formation offsets
     const formationOffsets = [
       { x: -100, y: -100 },
       { x: 100, y: -100 },
@@ -164,10 +248,10 @@ class PlayScene extends Phaser.Scene {
     const friendlyCenter = { x: 1500, y: mapHeight - 200 };
     const enemyCenter = { x: 1500, y: 200 };
 
-    // Assign a portrait to each player group.
+    // Portraits for each group
     const portraitKeys = ['asahina', 'haruhi', 'nagato', 'koizumi', 'kyon'];
 
-    // --- Create Friendly Groups ---
+    // --- Friendly Groups ---
     this.playerGroups = [];
     this.playerGroupData = [];
     for (let i = 0; i < formationOffsets.length; i++) {
@@ -175,9 +259,10 @@ class PlayScene extends Phaser.Scene {
         x: friendlyCenter.x + formationOffsets[i].x,
         y: friendlyCenter.y + formationOffsets[i].y
       };
-      // Friendly ships use color 0x00FF00.
+      // Friendly => green
       let sprite = this.createTriangle(pos.x, pos.y, 0x00ff00, "はるか");
       this.gameObjectsContainer.add(sprite);
+
       let dataObj = {
         sprite: sprite,
         name: (i + 1).toString().padStart(2, '0'),
@@ -196,20 +281,22 @@ class PlayScene extends Phaser.Scene {
         currentTarget: null,
         portraitKey: portraitKeys[i]
       };
+
       this.playerGroups.push(dataObj);
       this.playerGroupData.push(dataObj);
     }
 
-    // --- Create Enemy Groups ---
+    // --- Enemy Groups ---
     this.enemyGroups = [];
     for (let i = 0; i < formationOffsets.length; i++) {
       let pos = {
         x: enemyCenter.x + formationOffsets[i].x,
         y: enemyCenter.y + formationOffsets[i].y
       };
-      // Enemy ships use color 0xFF0000.
+      // Enemy => red
       let sprite = this.createTriangle(pos.x, pos.y, 0xff0000, "はるか");
       this.gameObjectsContainer.add(sprite);
+
       let dataObj = {
         sprite: sprite,
         name: (i + 1).toString().padStart(2, '0'),
@@ -224,10 +311,11 @@ class PlayScene extends Phaser.Scene {
         targetY: sprite.y,
         currentTarget: null
       };
+
       this.enemyGroups.push(dataObj);
     }
 
-    // --- Set Up Physics Colliders ---
+    // Set up physics collisions
     this.allShipSprites = [];
     this.playerGroups.forEach(g => this.allShipSprites.push(g.sprite));
     this.enemyGroups.forEach(g => this.allShipSprites.push(g.sprite));
@@ -239,8 +327,9 @@ class PlayScene extends Phaser.Scene {
 
     this.mainCamera.centerOn(friendlyCenter.x, friendlyCenter.y);
 
-    // --- Bullet Tracers Collection & Combat Timers ---
+    // Bullet Tracers & Timers
     this.bulletTracers = [];
+
     this.time.addEvent({
       delay: 500,
       callback: () => this.checkCombat(),
@@ -252,7 +341,7 @@ class PlayScene extends Phaser.Scene {
       loop: true
     });
 
-    // --- UI Elements for STATUS & CONDITION Windows ---
+    // UI for STATUS / CONDITION
     this.selectedInfoText = this.add.text(960 + 10, 30 + 10, "NO FLEET SELECTED", {
       fontSize: '16px',
       color: '#ffffff'
@@ -269,6 +358,7 @@ class PlayScene extends Phaser.Scene {
       this.uiContainer.add(line);
     }
 
+    // Overlay container for minimap rectangle
     this.overlayContainer = this.add.container(0, 0);
     this.mainCamera.ignore(this.overlayContainer);
     this.uiCamera.ignore(this.overlayContainer);
@@ -277,20 +367,14 @@ class PlayScene extends Phaser.Scene {
     this.overlayContainer.add(this.minimapOverlay);
     this.overlayContainer.setDepth(1000);
 
+    // Initialize condition lines
     this.updateConditionUI();
-    
-    // Set default game speed to 1x.
-    this.setGameSpeed(1);
+
+    // Default speed is 1x (but not "used" yet by a click)
+    // No highlight by default. The user must explicitly click a button to highlight it.
   }
 
-  // Helper method to set the overall game speed.
-  setGameSpeed(speed) {
-    this.physics.world.timeScale = speed;
-    this.time.timeScale = speed;
-    this.tweens.timeScale = speed;
-  }
-
-  // Helper: Draw a window frame.
+  // Draw window frame with optional background
   drawWindowFrame(x, y, width, height, label, bgColor) {
     const headerHeight = 20;
     if (label === "STATUS" || label === "CONDITION OF YOUR SIDE") {
@@ -313,9 +397,9 @@ class PlayScene extends Phaser.Scene {
     labelText.setOrigin(0, 0.5);
     this.uiContainer.add(frame);
     this.uiContainer.add(labelText);
-  }  
+  }
 
-  // createTriangle: Draws the ship group (a triangle with small detail triangles).
+  // createTriangle: draws a triangular "ship" shape
   createTriangle(x, y, mainColor, label) {
     const color = mainColor;
     const opacity = 0.6;
@@ -334,6 +418,7 @@ class PlayScene extends Phaser.Scene {
     graphics.closePath();
     graphics.fillPath();
 
+    // Additional small triangles
     const smallTriangleHeight = 10;
     const smallTriangleBaseHalf = 5;
     const center = {
@@ -384,16 +469,18 @@ class PlayScene extends Phaser.Scene {
 
     container.add(graphics);
 
-    const text = this.add.text(0, 0, "は\nる\nか", {
+    const text = this.add.text(0, 0, label, {
       fontSize: '10px',
       color: '#ffffff',
       align: 'center'
     }).setOrigin(0.5);
     container.add(text);
 
+    // If enemy, flip vertically to face up
     if (color === 0xff0000) {
       container.setScale(0.8, -0.8);
       text.scaleY = -1;
+
       let hpText = this.add.text(0, 30, "15000", {
         fontSize: '10px',
         color: '#ffffff',
@@ -403,23 +490,28 @@ class PlayScene extends Phaser.Scene {
       hpText.scaleY = -1;
       container.add(hpText);
       container.hpText = hpText;
+
     } else {
+      // Friendly => face down
       container.setScale(0.8);
     }
 
+    // Physics body
     this.physics.add.existing(container);
     container.setSize(50, 50);
     container.body.setCollideWorldBounds(true);
     container.body.setOffset(-25, -25);
     container.setInteractive(new Phaser.Geom.Rectangle(-25, -25, 50, 50), Phaser.Geom.Rectangle.Contains);
     container.body.setBounce(0.4);
+
     return container;
   }
 
-  // Handle left-click: select a friendly group or issue a move command.
+  // Left-click: either select a friendly group or move the selected group
   handleLeftClick(pointer) {
     const worldPoint = pointer.positionToCamera(this.mainCamera);
     let clickedGroup = null;
+
     for (let grp of this.playerGroups) {
       if (!grp.alive) continue;
       const bounds = grp.sprite.getBounds();
@@ -428,9 +520,14 @@ class PlayScene extends Phaser.Scene {
         break;
       }
     }
+
     if (clickedGroup) {
+      // Un-highlight any previously selected
       this.playerGroups.forEach(g => {
-        if (g.highlight) { g.highlight.destroy(); g.highlight = null; }
+        if (g.highlight) {
+          g.highlight.destroy();
+          g.highlight = null;
+        }
       });
       this.selectedGroup = clickedGroup;
       clickedGroup.highlight = this.add.graphics();
@@ -439,17 +536,18 @@ class PlayScene extends Phaser.Scene {
       clickedGroup.sprite.addAt(clickedGroup.highlight, 0);
       this.updateSelectedInfo();
     } else {
+      // If we have a selected group, move it
       if (this.selectedGroup) {
         this.moveGroupTo(this.selectedGroup, worldPoint.x, worldPoint.y);
       }
     }
   }
 
-  // Command a group to move; also place a waypoint marker and connecting line.
   moveGroupTo(group, x, y) {
     group.targetX = x;
     group.targetY = y;
     this.physics.moveTo(group.sprite, x, y, group.speed);
+
     if (group.waypoint) {
       group.waypoint.destroy();
       group.waypoint = null;
@@ -458,9 +556,11 @@ class PlayScene extends Phaser.Scene {
       group.waypointLine.destroy();
       group.waypointLine = null;
     }
+
     group.waypoint = this.add.graphics();
     group.waypoint.fillStyle(0xffff00, 1);
     group.waypoint.fillTriangle(x - 10, y, x + 10, y, x, y + 15);
+
     group.waypointLine = this.add.graphics();
     group.waypointLine.lineStyle(2, 0xffff00, 1);
     group.waypointLine.beginPath();
@@ -469,7 +569,7 @@ class PlayScene extends Phaser.Scene {
     group.waypointLine.strokePath();
   }
 
-  // Unselect the currently selected group.
+  // Unselect currently selected group
   unselectGroup() {
     if (this.selectedGroup) {
       if (this.selectedGroup.highlight) {
@@ -489,15 +589,21 @@ class PlayScene extends Phaser.Scene {
     }
   }
 
-  // Enemy AI: each enemy group moves toward its nearest friendly target.
+  // Enemy AI: move toward nearest friendly
   updateEnemyAI() {
+    if (this.isPaused) return; // Skip logic if paused
+
     for (let enemy of this.enemyGroups) {
       if (!enemy.alive) continue;
       let nearest = null;
       let nearestDist = Infinity;
+
       for (let player of this.playerGroups) {
         if (!player.alive) continue;
-        let dist = Phaser.Math.Distance.Between(enemy.sprite.x, enemy.sprite.y, player.sprite.x, player.sprite.y);
+        let dist = Phaser.Math.Distance.Between(
+          enemy.sprite.x, enemy.sprite.y,
+          player.sprite.x, player.sprite.y
+        );
         if (dist < nearestDist) {
           nearestDist = dist;
           nearest = player;
@@ -515,12 +621,18 @@ class PlayScene extends Phaser.Scene {
     }
   }
 
-  // Check combat range and deal damage.
+  // Check combat range and deal damage
   checkCombat() {
+    if (this.isPaused) return; // Skip combat if paused
+
+    // Player side
     this.playerGroups.forEach(player => {
       if (!player.alive) return;
       if (player.currentTarget && player.currentTarget.alive) {
-        let dist = Phaser.Math.Distance.Between(player.sprite.x, player.sprite.y, player.currentTarget.sprite.x, player.currentTarget.sprite.y);
+        let dist = Phaser.Math.Distance.Between(
+          player.sprite.x, player.sprite.y,
+          player.currentTarget.sprite.x, player.currentTarget.sprite.y
+        );
         if (dist < 200) {
           this.dealDamage(player, player.currentTarget);
           this.createBulletTracer(player, player.currentTarget);
@@ -531,7 +643,10 @@ class PlayScene extends Phaser.Scene {
       let minDist = Infinity;
       this.enemyGroups.forEach(enemy => {
         if (!enemy.alive) return;
-        let dist = Phaser.Math.Distance.Between(player.sprite.x, player.sprite.y, enemy.sprite.x, enemy.sprite.y);
+        let dist = Phaser.Math.Distance.Between(
+          player.sprite.x, player.sprite.y,
+          enemy.sprite.x, enemy.sprite.y
+        );
         if (dist < minDist && dist < 200) {
           minDist = dist;
           closest = enemy;
@@ -544,10 +659,14 @@ class PlayScene extends Phaser.Scene {
       }
     });
 
+    // Enemy side
     this.enemyGroups.forEach(enemy => {
       if (!enemy.alive) return;
       if (enemy.currentTarget && enemy.currentTarget.alive) {
-        let dist = Phaser.Math.Distance.Between(enemy.sprite.x, enemy.sprite.y, enemy.currentTarget.sprite.x, enemy.currentTarget.sprite.y);
+        let dist = Phaser.Math.Distance.Between(
+          enemy.sprite.x, enemy.sprite.y,
+          enemy.currentTarget.sprite.x, enemy.currentTarget.sprite.y
+        );
         if (dist < 200) {
           this.dealDamage(enemy, enemy.currentTarget);
           this.createBulletTracer(enemy, enemy.currentTarget);
@@ -558,7 +677,10 @@ class PlayScene extends Phaser.Scene {
       let minDist = Infinity;
       this.playerGroups.forEach(player => {
         if (!player.alive) return;
-        let dist = Phaser.Math.Distance.Between(enemy.sprite.x, enemy.sprite.y, player.sprite.x, player.sprite.y);
+        let dist = Phaser.Math.Distance.Between(
+          enemy.sprite.x, enemy.sprite.y,
+          player.sprite.x, player.sprite.y
+        );
         if (dist < minDist && dist < 200) {
           minDist = dist;
           closest = player;
@@ -572,11 +694,12 @@ class PlayScene extends Phaser.Scene {
     });
   }
 
-  // Basic damage calculation.
+  // Basic damage logic
   dealDamage(attacker, defender) {
     let damage = attacker.offense;
     damage = Math.max(0, damage - defender.defense * 0.1);
     defender.hp -= damage;
+
     if (defender.hp <= 0) {
       defender.hp = 0;
       defender.alive = false;
@@ -587,6 +710,8 @@ class PlayScene extends Phaser.Scene {
       defender.sprite.destroy();
       this.checkEndCondition();
     }
+
+    // If a player took damage, update UI
     if (defender.isPlayer) {
       this.updateConditionUI();
       if (this.selectedGroup === defender) {
@@ -595,10 +720,10 @@ class PlayScene extends Phaser.Scene {
     }
   }
 
-  // Check if one side has been wiped out.
   checkEndCondition() {
     let playerAliveCount = this.playerGroups.filter(g => g.alive).length;
     let enemyAliveCount = this.enemyGroups.filter(g => g.alive).length;
+
     if (playerAliveCount === 0) {
       this.scene.start('EndScene', { result: 'lose', level: this.selectedLevel });
     } else if (enemyAliveCount === 0) {
@@ -631,6 +756,10 @@ class PlayScene extends Phaser.Scene {
   }
 
   update() {
+    // If paused, skip all movement/tracer logic
+    if (this.isPaused) return;
+
+    // Stop ships near target
     [...this.playerGroups, ...this.enemyGroups].forEach(group => {
       if (!group.alive) return;
       const dx = group.targetX - group.sprite.x;
@@ -641,26 +770,32 @@ class PlayScene extends Phaser.Scene {
       }
     });
 
+    // Minimap camera viewport
     if (this.minimapOverlay) {
       this.minimapOverlay.clear();
       this.minimapOverlay.lineStyle(2, 0xff0000, 1);
+
       let vwX = this.mainCamera.scrollX;
       let vwY = this.mainCamera.scrollY;
       let vwW = this.mainCamera.width / this.mainCamera.zoom;
       let vwH = this.mainCamera.height / this.mainCamera.zoom;
       let scale = this.minimapCamera.zoom;
+
       let mmX = 960 + vwX * scale;
       let mmY = 400 + vwY * scale;
       let mmW = vwW * scale;
       let mmH = vwH * scale;
+
       this.minimapOverlay.strokeRect(mmX, mmY, mmW, mmH);
     }
 
+    // Update waypoints
     this.playerGroups.forEach(group => {
       if (group.waypoint && group.alive) {
         const dx = group.targetX - group.sprite.x;
         const dy = group.targetY - group.sprite.y;
         const dist = Math.sqrt(dx * dx + dy * dy);
+
         if (dist < 4) {
           group.waypoint.destroy();
           group.waypointLine.destroy();
@@ -677,6 +812,7 @@ class PlayScene extends Phaser.Scene {
       }
     });
 
+    // Update bullet tracers
     for (let i = this.bulletTracers.length - 1; i >= 0; i--) {
       let tracer = this.bulletTracers[i];
       let elapsed = this.time.now - tracer.startTime;
@@ -698,6 +834,7 @@ class PlayScene extends Phaser.Scene {
       }
     }
 
+    // Update enemy HP text
     this.enemyGroups.forEach(enemy => {
       if (enemy.alive && enemy.sprite && enemy.sprite.hpText) {
         enemy.sprite.hpText.setText(enemy.hp.toString());
@@ -711,6 +848,7 @@ class PlayScene extends Phaser.Scene {
     const angle = Math.atan2(dy, dx);
     const distance = Phaser.Math.Distance.Between(x1, y1, x2, y2);
     let drawn = -offset;
+
     while (drawn < distance) {
       let start = Math.max(drawn, 0);
       let end = drawn + dashLength;
@@ -729,7 +867,7 @@ class PlayScene extends Phaser.Scene {
     }
   }
 
-  // Play "spaceAttack" sound each time a bullet tracer is created.
+  // Each shot -> "spaceAttack" and a tracer
   createBulletTracer(attacker, defender) {
     this.sound.play('spaceAttack');
     let tracer = {
@@ -743,9 +881,9 @@ class PlayScene extends Phaser.Scene {
     this.bulletTracers.push(tracer);
   }
 
-  // Show portrait on main map only: slide in from the left, hold for 4 seconds, then fade out.
+  // Show portrait for a few seconds
   showPortrait(portraitKey) {
-    // Fade out any currently active portraits.
+    // Fade out any currently active portraits
     if (this.activePortraits && this.activePortraits.length > 0) {
       this.activePortraits.forEach(portrait => {
         this.tweens.add({
@@ -759,24 +897,24 @@ class PlayScene extends Phaser.Scene {
       });
       this.activePortraits = [];
     }
-    
+
     const startX = -200;
-    const bottomY = this.game.config.height; // Align bottom
+    const bottomY = this.game.config.height;
     let portrait = this.add.image(startX, bottomY, portraitKey);
     portrait.setScrollFactor(0);
     portrait.setDepth(9999);
     portrait.setScale(0.75);
     portrait.setOrigin(0.5, 1);
 
-    // Exclude portrait from the minimap and UI cameras.
     this.minimapCamera.ignore(portrait);
     this.uiCamera.ignore(portrait);
-    
+
     this.activePortraits.push(portrait);
 
+    // Slide in, wait 4s, fade out
     this.tweens.add({
       targets: portrait,
-      x: 350, // Slide in to x=350.
+      x: 350,
       duration: 1000,
       ease: 'Power2',
       onComplete: () => {
