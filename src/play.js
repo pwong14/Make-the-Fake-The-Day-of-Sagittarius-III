@@ -575,7 +575,7 @@ class PlayScene extends Phaser.Scene {
       defender.hp = 0;
       defender.alive = false;
       // Explosion sound
-      this.sound.play('explosion', { volume: 0.05 });
+      this.sound.play('explosion', { volume: 0.1 });
       // More elaborate dynamic explosion
       this.createFancyExplosion(defender.sprite.x, defender.sprite.y);
 
@@ -608,8 +608,7 @@ class PlayScene extends Phaser.Scene {
   }
 
   createBulletProjectile(attacker, defender, color) {
-    // ***Play 'spaceAttack' at 30% volume***
-    this.sound.play('spaceAttack', { volume: 0.01 });
+    this.sound.play('spaceAttack', { volume: 0.03 });
 
     // 1) Muzzle flash at the attacker
     this.createMuzzleFlash(attacker.sprite.x, attacker.sprite.y, color);

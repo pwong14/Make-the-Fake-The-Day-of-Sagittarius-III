@@ -3,7 +3,17 @@ class MenuScene extends Phaser.Scene {
     super({ key: 'MenuScene' });
   }
 
+  preload() {
+    // Load the battle theme so it can be played immediately
+    this.load.audio('battleTheme', 'assets/battleTheme.mp3');
+  }
+
   create() {
+    // Immediately start playing the battle theme (loop if you want continuous music)
+    // e.g. { loop: true, volume: 1 } for infinite loop at full volume
+    this.bgm = this.sound.add('battleTheme', { loop: true, volume: 0.2 });
+    this.bgm.play();
+
     const { width, height } = this.sys.game.config;
 
     // 1) Draw a dark background
@@ -27,7 +37,6 @@ class MenuScene extends Phaser.Scene {
     }
 
     // 3) Title text (large, centered, stylized)
-    //    - Using white fill + a colored stroke to give a glow/outline look
     this.titleText = this.add.text(width / 2, 100, "THE DAY OF\nSAGITTARIUS III", {
       fontFamily: 'Georgia, serif',
       fontSize: '48px',
@@ -39,13 +48,12 @@ class MenuScene extends Phaser.Scene {
 
     // 4) Helper function to create a rectangular button with hover effects
     const createButton = (label, x, y, callback) => {
-      // Button dimensions
       const buttonWidth = 180;
       const buttonHeight = 50;
 
       // Draw the button background as a Phaser Graphics object
       const buttonBG = this.add.graphics();
-      buttonBG.fillStyle(0x004400, 1); // dark green
+      buttonBG.fillStyle(0x004400, 1);
       buttonBG.fillRect(x - buttonWidth / 2, y - buttonHeight / 2, buttonWidth, buttonHeight);
 
       // Button text on top of the background
