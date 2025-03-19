@@ -4,9 +4,12 @@ class PlayScene extends Phaser.Scene {
   }
 
   preload() {
-    // Load sounds
+    // Load existing sounds
     this.load.audio('explosion', 'assets/explosion.mp3');
     this.load.audio('spaceAttack', 'assets/spaceAttack.mp3');
+
+    // *** Load the rocket2 sound (not in your original code, but let's assume you want it) ***
+    this.load.audio('rocket2', 'assets/rocket2.mp3');
 
     // Load portrait images
     this.load.image('asahina', 'assets/asahina.png');
@@ -14,6 +17,14 @@ class PlayScene extends Phaser.Scene {
     this.load.image('nagato', 'assets/nagato.png');
     this.load.image('koizumi', 'assets/koizumi.png');
     this.load.image('kyon', 'assets/kyon.png');
+
+    // *** Load voice audio for each character so we can play them. ***
+    // Make sure these files exist in your assets folder.
+    this.load.audio('asahinaVoice', 'assets/asahina.wav');
+    this.load.audio('haruhiVoice',  'assets/haruhi.wav');
+    this.load.audio('nagatoVoice',  'assets/nagato.wav');
+    this.load.audio('koizumiVoice', 'assets/koizumi.wav');
+    this.load.audio('kyonVoice',    'assets/kyon.wav');
   }
 
   init(data) {
@@ -24,14 +35,16 @@ class PlayScene extends Phaser.Scene {
     // Track active portraits
     this.activePortraits = [];
 
+    // *** Also track the currently playing voice so we can stop it if new voice starts. ***
+    this.currentVoiceSound = null;
+
     // Map dimensions
     const mapWidth = 3000;
     const mapHeight = 3000;
 
     // Arcade physics bounds
     this.physics.world.setBounds(0, 0, mapWidth, mapHeight);
-
-    // Disable fixed-step so timeScale changes actually speed/slow physics
+    // Turn off fixed-step so timeScale speeds/slows the game
     this.physics.world.useFixedStep = false;
 
     // Cameras
@@ -50,120 +63,91 @@ class PlayScene extends Phaser.Scene {
     this.gameObjectsContainer = this.add.container(0, 0);
     this.uiContainer = this.add.container(0, 0);
 
-    // Exclude UI from main & minimap cameras
+    // Exclude UI from main & minimap
     this.mainCamera.ignore(this.uiContainer);
     this.minimapCamera.ignore(this.uiContainer);
 
-    // Exclude game objects from the UI camera
+    // Exclude game objects from UI
     this.uiCamera.ignore(this.gameObjectsContainer);
 
-    // A small helper to highlight exactly one button, unhighlight the rest
+    // --- Speed Buttons ---
+    const buttonY = 50;
+    this.speedButtons = {};
     this.highlightButton = (btn) => {
-      // Reset them all to black
       this.speedButtons.oneX.setStyle({ backgroundColor: '#000000' });
       this.speedButtons.twoX.setStyle({ backgroundColor: '#000000' });
       this.speedButtons.threeX.setStyle({ backgroundColor: '#000000' });
-
-      // Now highlight the chosen one
       if (btn) {
         btn.setStyle({ backgroundColor: '#444444' });
       }
     };
 
-    // --- Create Speed Buttons Only ---
-    // Move them down to avoid overlapping window titles
-    const buttonY = 50;
-    this.speedButtons = {};
-
     // 1x speed
     this.speedButtons.oneX = this.add.text(10, buttonY, '1x', {
-      fontSize: '20px',
-      color: '#ffffff',
-      backgroundColor: '#000000'
+      fontSize: '20px', color: '#ffffff', backgroundColor: '#000000'
     })
       .setPadding(5)
-      .setInteractive();
+      .setInteractive()
+      .on('pointerdown', () => {
+        this.physics.world.timeScale = 1;
+        this.time.timeScale = 1;
+        this.tweens.timeScale = 1;
+        this.highlightButton(this.speedButtons.oneX);
+      });
 
-    this.speedButtons.oneX.on('pointerdown', () => {
-      // Ships move normal speed
-      this.physics.world.timeScale = 1;
-      // Keep UI updates normal
-      this.time.timeScale = 1;
-      this.tweens.timeScale = 1;
-      // Highlight this button
-      this.highlightButton(this.speedButtons.oneX);
-    });
-
-    // 2x speed (in your code, you use 0.6 as "faster")
+    // 2x speed (0.6 in your code)
     this.speedButtons.twoX = this.add.text(70, buttonY, '2x', {
-      fontSize: '20px',
-      color: '#ffffff',
-      backgroundColor: '#000000'
+      fontSize: '20px', color: '#ffffff', backgroundColor: '#000000'
     })
       .setPadding(5)
-      .setInteractive();
+      .setInteractive()
+      .on('pointerdown', () => {
+        this.physics.world.timeScale = 0.6;
+        this.time.timeScale = 1;
+        this.tweens.timeScale = 1;
+        this.highlightButton(this.speedButtons.twoX);
+      });
 
-    this.speedButtons.twoX.on('pointerdown', () => {
-      // "2x" => 0.6 in your code
-      this.physics.world.timeScale = 0.6;
-      this.time.timeScale = 1;
-      this.tweens.timeScale = 1;
-      this.highlightButton(this.speedButtons.twoX);
-    });
-
-    // 3x speed (you use 0.3 to be "faster")
+    // 3x speed (0.3 in your code)
     this.speedButtons.threeX = this.add.text(130, buttonY, '3x', {
-      fontSize: '20px',
-      color: '#ffffff',
-      backgroundColor: '#000000'
+      fontSize: '20px', color: '#ffffff', backgroundColor: '#000000'
     })
       .setPadding(5)
-      .setInteractive();
+      .setInteractive()
+      .on('pointerdown', () => {
+        this.physics.world.timeScale = 0.3;
+        this.time.timeScale = 1;
+        this.tweens.timeScale = 1;
+        this.highlightButton(this.speedButtons.threeX);
+      });
 
-    this.speedButtons.threeX.on('pointerdown', () => {
-      // "3x" => 0.3 in your code
-      this.physics.world.timeScale = 0.3;
-      this.time.timeScale = 1;
-      this.tweens.timeScale = 1;
-      this.highlightButton(this.speedButtons.threeX);
-    });
-
-    // Add them to the UI
     this.uiContainer.add([
       this.speedButtons.oneX,
       this.speedButtons.twoX,
       this.speedButtons.threeX
     ]);
 
-    // --- Draw the Grid Background ---
+    // Grid Background
     let gridGraphics = this.add.graphics();
-    gridGraphics.fillStyle(0x0E121C, 1);
-    gridGraphics.fillRect(0, 0, mapWidth, mapHeight);
+    gridGraphics.fillStyle(0x0E121C, 1).fillRect(0, 0, mapWidth, mapHeight);
     gridGraphics.lineStyle(1, 0x444444, 1);
     for (let x = 0; x <= mapWidth; x += 50) {
-      gridGraphics.beginPath();
-      gridGraphics.moveTo(x, 0);
-      gridGraphics.lineTo(x, mapHeight);
-      gridGraphics.strokePath();
+      gridGraphics.beginPath().moveTo(x, 0).lineTo(x, mapHeight).strokePath();
     }
     for (let y = 0; y <= mapHeight; y += 50) {
-      gridGraphics.beginPath();
-      gridGraphics.moveTo(0, y);
-      gridGraphics.lineTo(mapWidth, y);
-      gridGraphics.strokePath();
+      gridGraphics.beginPath().moveTo(0, y).lineTo(mapWidth, y).strokePath();
     }
     this.gameObjectsContainer.add(gridGraphics);
 
-    // --- Draw Window Frames ---
+    // Window Frames
     this.drawWindowFrame(0, 0, 960, 720, "Map (x 1)", 0x0E121C);
     this.drawWindowFrame(960, 0, 320, 150, "STATUS", 0x192743);
     this.drawWindowFrame(960, 150, 320, 220, "CONDITION OF YOUR SIDE", 0x192743);
     this.drawWindowFrame(960, 370, 320, 350, "LOCATION", 0x0E121C);
 
-    // Input Handling
+    // Input handling
     this.draggingCamera = false;
     this.input.mouse.disableContextMenu();
-
     this.input.on('pointerdown', (pointer) => {
       if (pointer.rightButtonDown()) {
         if (this.selectedGroup) {
@@ -193,7 +177,7 @@ class PlayScene extends Phaser.Scene {
       }
     });
 
-    // Formation Definitions
+    // Formation offsets
     const formationOffsets = [
       { x: -100, y: -100 },
       { x: 100, y: -100 },
@@ -207,7 +191,7 @@ class PlayScene extends Phaser.Scene {
     // Portrait keys
     const portraitKeys = ['asahina', 'haruhi', 'nagato', 'koizumi', 'kyon'];
 
-    // --- Create Friendly Groups ---
+    // Player Groups
     this.playerGroups = [];
     this.playerGroupData = [];
     for (let i = 0; i < formationOffsets.length; i++) {
@@ -215,7 +199,6 @@ class PlayScene extends Phaser.Scene {
         x: friendlyCenter.x + formationOffsets[i].x,
         y: friendlyCenter.y + formationOffsets[i].y
       };
-      // Friendly => color 0x00FF00
       let sprite = this.createTriangle(pos.x, pos.y, 0x00ff00, "はるか");
       this.gameObjectsContainer.add(sprite);
 
@@ -237,19 +220,17 @@ class PlayScene extends Phaser.Scene {
         currentTarget: null,
         portraitKey: portraitKeys[i]
       };
-
       this.playerGroups.push(dataObj);
       this.playerGroupData.push(dataObj);
     }
 
-    // --- Create Enemy Groups ---
+    // Enemy Groups
     this.enemyGroups = [];
     for (let i = 0; i < formationOffsets.length; i++) {
       let pos = {
         x: enemyCenter.x + formationOffsets[i].x,
         y: enemyCenter.y + formationOffsets[i].y
       };
-      // Enemy => color 0xFF0000
       let sprite = this.createTriangle(pos.x, pos.y, 0xff0000, "はるか");
       this.gameObjectsContainer.add(sprite);
 
@@ -267,11 +248,10 @@ class PlayScene extends Phaser.Scene {
         targetY: sprite.y,
         currentTarget: null
       };
-
       this.enemyGroups.push(dataObj);
     }
 
-    // Physics colliders
+    // Colliders
     this.allShipSprites = [];
     this.playerGroups.forEach(g => this.allShipSprites.push(g.sprite));
     this.enemyGroups.forEach(g => this.allShipSprites.push(g.sprite));
@@ -281,11 +261,9 @@ class PlayScene extends Phaser.Scene {
       }
     }
 
-    // Center camera on friendly group
     this.mainCamera.centerOn(friendlyCenter.x, friendlyCenter.y);
 
-    // Bullet Tracers + Timers
-    this.bulletTracers = [];
+    // Timers
     this.time.addEvent({
       delay: 500,
       callback: () => this.checkCombat(),
@@ -297,24 +275,22 @@ class PlayScene extends Phaser.Scene {
       loop: true
     });
 
-    // UI (STATUS & CONDITION windows)
+    // UI
     this.selectedInfoText = this.add.text(960 + 10, 30 + 10, "NO FLEET SELECTED", {
-      fontSize: '16px',
-      color: '#ffffff'
+      fontSize: '16px', color: '#ffffff'
     });
     this.uiContainer.add(this.selectedInfoText);
 
     this.conditionLines = [];
     for (let i = 0; i < 5; i++) {
       let line = this.add.text(960 + 10, 180 + 10 + i * 20, "", {
-        fontSize: '16px',
-        color: '#ffffff'
+        fontSize: '16px', color: '#ffffff'
       });
       this.conditionLines.push(line);
       this.uiContainer.add(line);
     }
 
-    // Overlay container for minimap viewport rectangle
+    // Container for minimap overlay
     this.overlayContainer = this.add.container(0, 0);
     this.mainCamera.ignore(this.overlayContainer);
     this.uiCamera.ignore(this.overlayContainer);
@@ -323,37 +299,26 @@ class PlayScene extends Phaser.Scene {
     this.overlayContainer.add(this.minimapOverlay);
     this.overlayContainer.setDepth(1000);
 
-    // Update UI for condition lines
     this.updateConditionUI();
   }
 
-  // Helper to draw a window frame
   drawWindowFrame(x, y, width, height, label, bgColor) {
     const headerHeight = 20;
-    // Fill background for certain labels
     if (label === "STATUS" || label === "CONDITION OF YOUR SIDE") {
       let bg = this.add.graphics();
-      bg.fillStyle(bgColor, 1);
-      bg.fillRect(x, y + headerHeight, width, height - headerHeight);
+      bg.fillStyle(bgColor, 1).fillRect(x, y + headerHeight, width, height - headerHeight);
       this.uiContainer.add(bg);
     }
-    let frame = this.add.graphics();
-    frame.lineStyle(2, 0x9FA8C6, 1);
+    let frame = this.add.graphics().lineStyle(2, 0x9FA8C6, 1);
     frame.strokeRect(x, y, width, height);
-    frame.fillStyle(0x9FA8C6, 1);
-    frame.fillRect(x, y, width, headerHeight);
-    let labelText = this.add.text(x + 10, y + headerHeight / 2, label, { 
-      fontSize: '14px', 
-      color: '#0E121C',
-      fontFamily: "Arial Unicode MS",
-      align: 'left'
-    });
-    labelText.setOrigin(0, 0.5);
+    frame.fillStyle(0x9FA8C6, 1).fillRect(x, y, width, headerHeight);
+    let labelText = this.add.text(x + 10, y + headerHeight / 2, label, {
+      fontSize: '14px', color: '#0E121C', fontFamily: "Arial Unicode MS"
+    }).setOrigin(0, 0.5);
     this.uiContainer.add(frame);
     this.uiContainer.add(labelText);
   }
 
-  // Creates a triangular "ship"
   createTriangle(x, y, mainColor, label) {
     const color = mainColor;
     const opacity = 0.6;
@@ -372,7 +337,7 @@ class PlayScene extends Phaser.Scene {
     graphics.closePath();
     graphics.fillPath();
 
-    // Additional small triangles
+    // Additional small triangles for detail
     const smallTriangleHeight = 10;
     const smallTriangleBaseHalf = 5;
     const center = {
@@ -382,34 +347,32 @@ class PlayScene extends Phaser.Scene {
 
     function drawSmallTriangleTop(vertex) {
       const D = { x: 0, y: -1 };
-      const origApex = { x: vertex.x + D.x * smallTriangleHeight, y: vertex.y + D.y * smallTriangleHeight };
+      const apex = { x: vertex.x + D.x * smallTriangleHeight, y: vertex.y + D.y * smallTriangleHeight };
       const tangent = { x: -D.y, y: D.x };
-      const origBaseLeft = { x: vertex.x + tangent.x * smallTriangleBaseHalf, y: vertex.y + tangent.y * smallTriangleBaseHalf };
-      const origBaseRight = { x: vertex.x - tangent.x * smallTriangleBaseHalf, y: vertex.y - tangent.y * smallTriangleBaseHalf };
-      const centerY = (origApex.y + origBaseLeft.y + origBaseRight.y) / 3;
-      const flippedApex = { x: origApex.x, y: 2 * centerY - origApex.y };
-      const flippedBaseLeft = { x: origBaseLeft.x, y: 2 * centerY - origBaseLeft.y };
-      const flippedBaseRight = { x: origBaseRight.x, y: 2 * centerY - origBaseRight.y };
-      graphics.fillStyle(color, opacity);
-      graphics.beginPath();
-      graphics.moveTo(flippedApex.x, flippedApex.y);
-      graphics.lineTo(flippedBaseLeft.x, flippedBaseLeft.y);
-      graphics.lineTo(flippedBaseRight.x, flippedBaseRight.y);
+      const baseLeft = { x: vertex.x + tangent.x * smallTriangleBaseHalf, y: vertex.y + tangent.y * smallTriangleBaseHalf };
+      const baseRight = { x: vertex.x - tangent.x * smallTriangleBaseHalf, y: vertex.y - tangent.y * smallTriangleBaseHalf };
+      const cx = (apex.y + baseLeft.y + baseRight.y) / 3;
+      const flipApex = { x: apex.x, y: 2*cx - apex.y };
+      const flipL = { x: baseLeft.x, y: 2*cx - baseLeft.y };
+      const flipR = { x: baseRight.x, y: 2*cx - baseRight.y };
+      graphics.fillStyle(color, opacity).beginPath();
+      graphics.moveTo(flipApex.x, flipApex.y);
+      graphics.lineTo(flipL.x, flipL.y);
+      graphics.lineTo(flipR.x, flipR.y);
       graphics.closePath();
       graphics.fillPath();
     }
 
     function drawSmallTriangleAtVertex(vertex) {
       const dir = { x: vertex.x - center.x, y: vertex.y - center.y };
-      const mag = Math.sqrt(dir.x * dir.x + dir.y * dir.y);
-      const D = { x: dir.x / mag, y: dir.y / mag };
+      const mag = Math.sqrt(dir.x*dir.x + dir.y*dir.y);
+      const D = { x: dir.x/mag, y: dir.y/mag };
       const apex = vertex;
-      const baseCenter = { x: vertex.x + D.x * smallTriangleHeight, y: vertex.y + D.y * smallTriangleHeight };
+      const baseCenter = { x: apex.x + D.x*smallTriangleHeight, y: apex.y + D.y*smallTriangleHeight };
       const tangent = { x: -D.y, y: D.x };
-      const baseLeft = { x: baseCenter.x + tangent.x * smallTriangleBaseHalf, y: baseCenter.y + tangent.y * smallTriangleBaseHalf };
-      const baseRight = { x: baseCenter.x - tangent.x * smallTriangleBaseHalf, y: baseCenter.y - tangent.y * smallTriangleBaseHalf };
-      graphics.fillStyle(color, opacity);
-      graphics.beginPath();
+      const baseLeft = { x: baseCenter.x + tangent.x*smallTriangleBaseHalf, y: baseCenter.y + tangent.y*smallTriangleBaseHalf };
+      const baseRight = { x: baseCenter.x - tangent.x*smallTriangleBaseHalf, y: baseCenter.y - tangent.y*smallTriangleBaseHalf };
+      graphics.fillStyle(color, opacity).beginPath();
       graphics.moveTo(apex.x, apex.y);
       graphics.lineTo(baseLeft.x, baseLeft.y);
       graphics.lineTo(baseRight.x, baseRight.y);
@@ -423,48 +386,38 @@ class PlayScene extends Phaser.Scene {
 
     container.add(graphics);
 
-    // Add label text
-    const text = this.add.text(0, 0, label, {
-      fontSize: '10px',
-      color: '#ffffff',
-      align: 'center'
-    }).setOrigin(0.5);
+    const text = this.add.text(0, 0, label, { fontSize: '10px', color: '#ffffff', align: 'center' }).setOrigin(0.5);
     container.add(text);
 
-    // If enemy, flip vertically to face up
+    // If enemy, flip vertically
     if (color === 0xff0000) {
       container.setScale(0.8, -0.8);
       text.scaleY = -1;
       let hpText = this.add.text(0, 30, "15000", {
-        fontSize: '10px',
-        color: '#ffffff',
-        align: 'center'
+        fontSize: '10px', color: '#ffffff', align: 'center'
       });
       hpText.setOrigin(0.5, 1);
       hpText.scaleY = -1;
       container.add(hpText);
       container.hpText = hpText;
     } else {
-      // Friendly => face down
       container.setScale(0.8);
     }
 
     // Physics
     this.physics.add.existing(container);
-    container.setSize(50, 50);
-    container.body.setCollideWorldBounds(true);
-    container.body.setOffset(-25, -25);
-    container.setInteractive(new Phaser.Geom.Rectangle(-25, -25, 50, 50), Phaser.Geom.Rectangle.Contains);
-    container.body.setBounce(0.4);
+    container.setSize(50, 50).setInteractive(new Phaser.Geom.Rectangle(-25, -25, 50, 50), Phaser.Geom.Rectangle.Contains);
+    container.body.setCollideWorldBounds(true).setOffset(-25, -25);
+    container.body.setBounce(0.1);
+    container.body.setDamping(true);
+    container.body.setDrag(0.95);
 
     return container;
   }
 
-  // Left-click: select or move
   handleLeftClick(pointer) {
     const worldPoint = pointer.positionToCamera(this.mainCamera);
     let clickedGroup = null;
-
     for (let grp of this.playerGroups) {
       if (!grp.alive) continue;
       const bounds = grp.sprite.getBounds();
@@ -473,24 +426,20 @@ class PlayScene extends Phaser.Scene {
         break;
       }
     }
-
     if (clickedGroup) {
-      // Un-highlight any previously selected
+      // Un-highlight
       this.playerGroups.forEach(g => {
         if (g.highlight) {
           g.highlight.destroy();
           g.highlight = null;
         }
       });
-      // Select the new group
       this.selectedGroup = clickedGroup;
       clickedGroup.highlight = this.add.graphics();
-      clickedGroup.highlight.fillStyle(0x92ABFF, 0.3);
-      clickedGroup.highlight.fillCircle(0, 0, 60);
+      clickedGroup.highlight.fillStyle(0x92ABFF, 0.3).fillCircle(0, 0, 60);
       clickedGroup.sprite.addAt(clickedGroup.highlight, 0);
       this.updateSelectedInfo();
     } else {
-      // If we have a selected group, move it
       if (this.selectedGroup) {
         this.moveGroupTo(this.selectedGroup, worldPoint.x, worldPoint.y);
       }
@@ -501,29 +450,16 @@ class PlayScene extends Phaser.Scene {
     group.targetX = x;
     group.targetY = y;
     this.physics.moveTo(group.sprite, x, y, group.speed);
-
-    if (group.waypoint) {
-      group.waypoint.destroy();
-      group.waypoint = null;
-    }
-    if (group.waypointLine) {
-      group.waypointLine.destroy();
-      group.waypointLine = null;
-    }
+    if (group.waypoint) { group.waypoint.destroy(); group.waypoint = null; }
+    if (group.waypointLine) { group.waypointLine.destroy(); group.waypointLine = null; }
 
     group.waypoint = this.add.graphics();
-    group.waypoint.fillStyle(0xffff00, 1);
-    group.waypoint.fillTriangle(x - 10, y, x + 10, y, x, y + 15);
+    group.waypoint.fillStyle(0xffff00, 1).fillTriangle(x - 10, y, x + 10, y, x, y + 15);
 
-    group.waypointLine = this.add.graphics();
-    group.waypointLine.lineStyle(2, 0xffff00, 1);
-    group.waypointLine.beginPath();
-    group.waypointLine.moveTo(group.sprite.x, group.sprite.y);
-    group.waypointLine.lineTo(x, y);
-    group.waypointLine.strokePath();
+    group.waypointLine = this.add.graphics().lineStyle(2, 0xffff00, 1).beginPath();
+    group.waypointLine.moveTo(group.sprite.x, group.sprite.y).lineTo(x, y).strokePath();
   }
 
-  // Unselect currently selected group
   unselectGroup() {
     if (this.selectedGroup) {
       if (this.selectedGroup.highlight) {
@@ -543,19 +479,14 @@ class PlayScene extends Phaser.Scene {
     }
   }
 
-  // Enemy AI
   updateEnemyAI() {
     for (let enemy of this.enemyGroups) {
       if (!enemy.alive) continue;
       let nearest = null;
       let nearestDist = Infinity;
-
       for (let player of this.playerGroups) {
         if (!player.alive) continue;
-        let dist = Phaser.Math.Distance.Between(
-          enemy.sprite.x, enemy.sprite.y,
-          player.sprite.x, player.sprite.y
-        );
+        let dist = Phaser.Math.Distance.Between(enemy.sprite.x, enemy.sprite.y, player.sprite.x, player.sprite.y);
         if (dist < nearestDist) {
           nearestDist = dist;
           nearest = player;
@@ -573,19 +504,16 @@ class PlayScene extends Phaser.Scene {
     }
   }
 
-  // Check combat range and deal damage
   checkCombat() {
     // Player side
     this.playerGroups.forEach(player => {
       if (!player.alive) return;
       if (player.currentTarget && player.currentTarget.alive) {
-        let dist = Phaser.Math.Distance.Between(
-          player.sprite.x, player.sprite.y,
-          player.currentTarget.sprite.x, player.currentTarget.sprite.y
-        );
+        let dist = Phaser.Math.Distance.Between(player.sprite.x, player.sprite.y, player.currentTarget.sprite.x, player.currentTarget.sprite.y);
         if (dist < 200) {
+          const color = player.isPlayer ? 0x00ff00 : 0xff0000;
           this.dealDamage(player, player.currentTarget);
-          this.createBulletTracer(player, player.currentTarget);
+          this.createBulletProjectile(player, player.currentTarget, color);
           return;
         }
       }
@@ -593,10 +521,7 @@ class PlayScene extends Phaser.Scene {
       let minDist = Infinity;
       this.enemyGroups.forEach(enemy => {
         if (!enemy.alive) return;
-        let dist = Phaser.Math.Distance.Between(
-          player.sprite.x, player.sprite.y,
-          enemy.sprite.x, enemy.sprite.y
-        );
+        let dist = Phaser.Math.Distance.Between(player.sprite.x, player.sprite.y, enemy.sprite.x, enemy.sprite.y);
         if (dist < minDist && dist < 200) {
           minDist = dist;
           closest = enemy;
@@ -604,8 +529,9 @@ class PlayScene extends Phaser.Scene {
       });
       player.currentTarget = closest;
       if (closest) {
+        const color = player.isPlayer ? 0x00ff00 : 0xff0000;
         this.dealDamage(player, closest);
-        this.createBulletTracer(player, closest);
+        this.createBulletProjectile(player, closest, color);
       }
     });
 
@@ -613,13 +539,11 @@ class PlayScene extends Phaser.Scene {
     this.enemyGroups.forEach(enemy => {
       if (!enemy.alive) return;
       if (enemy.currentTarget && enemy.currentTarget.alive) {
-        let dist = Phaser.Math.Distance.Between(
-          enemy.sprite.x, enemy.sprite.y,
-          enemy.currentTarget.sprite.x, enemy.currentTarget.sprite.y
-        );
+        let dist = Phaser.Math.Distance.Between(enemy.sprite.x, enemy.sprite.y, enemy.currentTarget.sprite.x, enemy.currentTarget.sprite.y);
         if (dist < 200) {
+          const color = enemy.isPlayer ? 0x00ff00 : 0xff0000;
           this.dealDamage(enemy, enemy.currentTarget);
-          this.createBulletTracer(enemy, enemy.currentTarget);
+          this.createBulletProjectile(enemy, enemy.currentTarget, color);
           return;
         }
       }
@@ -627,10 +551,7 @@ class PlayScene extends Phaser.Scene {
       let minDist = Infinity;
       this.playerGroups.forEach(player => {
         if (!player.alive) return;
-        let dist = Phaser.Math.Distance.Between(
-          enemy.sprite.x, enemy.sprite.y,
-          player.sprite.x, player.sprite.y
-        );
+        let dist = Phaser.Math.Distance.Between(enemy.sprite.x, enemy.sprite.y, player.sprite.x, player.sprite.y);
         if (dist < minDist && dist < 200) {
           minDist = dist;
           closest = player;
@@ -638,13 +559,13 @@ class PlayScene extends Phaser.Scene {
       });
       enemy.currentTarget = closest;
       if (closest) {
+        const color = enemy.isPlayer ? 0x00ff00 : 0xff0000;
         this.dealDamage(enemy, closest);
-        this.createBulletTracer(enemy, closest);
+        this.createBulletProjectile(enemy, closest, color);
       }
     });
   }
 
-  // Basic damage logic
   dealDamage(attacker, defender) {
     let damage = attacker.offense;
     damage = Math.max(0, damage - defender.defense * 0.1);
@@ -653,7 +574,11 @@ class PlayScene extends Phaser.Scene {
     if (defender.hp <= 0) {
       defender.hp = 0;
       defender.alive = false;
-      this.sound.play('explosion');
+      // Explosion sound
+      this.sound.play('explosion', { volume: 0.05 });
+      // More elaborate dynamic explosion
+      this.createFancyExplosion(defender.sprite.x, defender.sprite.y);
+
       if (attacker.isPlayer) {
         this.showPortrait(attacker.portraitKey);
       }
@@ -661,7 +586,7 @@ class PlayScene extends Phaser.Scene {
       this.checkEndCondition();
     }
 
-    // If a player took damage, update condition UI
+    // If a player took damage, update UI
     if (defender.isPlayer) {
       this.updateConditionUI();
       if (this.selectedGroup === defender) {
@@ -671,14 +596,163 @@ class PlayScene extends Phaser.Scene {
   }
 
   checkEndCondition() {
+    // e.g. check if enemies or players remain
     let playerAliveCount = this.playerGroups.filter(g => g.alive).length;
     let enemyAliveCount = this.enemyGroups.filter(g => g.alive).length;
-
+  
     if (playerAliveCount === 0) {
       this.scene.start('EndScene', { result: 'lose', level: this.selectedLevel });
     } else if (enemyAliveCount === 0) {
       this.scene.start('EndScene', { result: 'win', level: this.selectedLevel });
     }
+  }
+
+  createBulletProjectile(attacker, defender, color) {
+    // ***Play 'spaceAttack' at 30% volume***
+    this.sound.play('spaceAttack', { volume: 0.01 });
+
+    // 1) Muzzle flash at the attacker
+    this.createMuzzleFlash(attacker.sprite.x, attacker.sprite.y, color);
+
+    // 2) A small bullet line traveling from attacker to target
+    const startX = attacker.sprite.x;
+    const startY = attacker.sprite.y;
+    const endX = defender.sprite.x;
+    const endY = defender.sprite.y;
+
+    let bulletGfx = this.add.graphics({ x: startX, y: startY });
+    bulletGfx.lineStyle(2, color, 1);
+
+    const dx = endX - startX;
+    const dy = endY - startY;
+
+    let paramObj = { progress: 0 };
+    this.tweens.add({
+      targets: paramObj,
+      progress: 1,
+      duration: 200, // bullet travel time
+      onUpdate: () => {
+        bulletGfx.clear();
+        bulletGfx.lineStyle(3, color, 1);
+        bulletGfx.beginPath();
+        bulletGfx.moveTo(0, 0);
+        const bulletLength = 15;
+        let t = paramObj.progress;
+        let curX = dx * t;
+        let curY = dy * t;
+        let angle = Math.atan2(dy, dx);
+        let headX = curX;
+        let headY = curY;
+        let tailX = headX - Math.cos(angle)*bulletLength;
+        let tailY = headY - Math.sin(angle)*bulletLength;
+
+        bulletGfx.lineTo(tailX, tailY);
+        bulletGfx.lineTo(headX, headY);
+        bulletGfx.strokePath();
+      },
+      onComplete: () => {
+        bulletGfx.destroy();
+        // Impact spark at the target
+        this.createImpactSpark(endX, endY, color);
+      }
+    });
+  }
+
+  createMuzzleFlash(x, y, color) {
+    let flash = this.add.graphics({ x, y });
+    flash.fillStyle(color, 1);
+    flash.fillCircle(0, 0, 8);
+    this.tweens.add({
+      targets: flash,
+      alpha: 0,
+      duration: 100,
+      onComplete: () => flash.destroy()
+    });
+  }
+
+  createImpactSpark(x, y, color) {
+    let spark = this.add.graphics({ x, y });
+    spark.lineStyle(2, color, 1);
+    spark.beginPath();
+    for (let i = 0; i < 6; i++) {
+      let angle = (Math.PI*2/6)*i;
+      let tx = Math.cos(angle)*6;
+      let ty = Math.sin(angle)*6;
+      spark.moveTo(0, 0);
+      spark.lineTo(tx, ty);
+    }
+    spark.strokePath();
+    this.tweens.add({
+      targets: spark,
+      alpha: 0,
+      duration: 150,
+      onComplete: () => spark.destroy()
+    });
+  }
+
+  createFancyExplosion(x, y) {
+    let container = this.add.container(x, y);
+
+    for (let i = 0; i < 2; i++) {
+      let ring = this.add.graphics();
+      ring.lineStyle(2, 0xffaa00);
+      ring.strokeCircle(0, 0, 10 + i*5);
+      container.add(ring);
+
+      this.tweens.add({
+        targets: ring,
+        scale: 2+i*0.5,
+        alpha: 0,
+        duration: 700,
+        onComplete: () => ring.destroy()
+      });
+    }
+
+    const arcCount = 5;
+    for (let j = 0; j < arcCount; j++) {
+      let arcG = this.add.graphics();
+      arcG.lineStyle(2, 0xffee00, 1);
+      let startAngle = Phaser.Math.FloatBetween(0, Math.PI*2);
+      let endAngle = startAngle + Phaser.Math.FloatBetween(0.5, 1);
+      arcG.beginPath();
+      arcG.arc(0, 0, Phaser.Math.Between(5, 15), startAngle, endAngle);
+      arcG.strokePath();
+      arcG.closePath();
+      container.add(arcG);
+
+      this.tweens.add({
+        targets: arcG,
+        scale: Phaser.Math.FloatBetween(1.5, 3),
+        alpha: 0,
+        duration: 700,
+        onComplete: () => arcG.destroy()
+      });
+    }
+
+    let debrisCount = 8;
+    for (let d = 0; d < debrisCount; d++) {
+      let line = this.add.graphics();
+      line.lineStyle(2, 0xffcc00);
+      line.beginPath();
+      line.moveTo(0, 0);
+      line.lineTo(Phaser.Math.Between(8, 15), 0);
+      line.strokePath();
+      line.closePath();
+      line.angle = (360/debrisCount)*d;
+      container.add(line);
+
+      this.tweens.add({
+        targets: line,
+        x: 30,
+        alpha: 0,
+        duration: 500,
+        onComplete: () => line.destroy()
+      });
+    }
+
+    this.time.delayedCall(800, () => {
+      container.destroy();
+    });
   }
 
   updateSelectedInfo() {
@@ -706,18 +780,16 @@ class PlayScene extends Phaser.Scene {
   }
 
   update() {
-    // Stop ships near target
     [...this.playerGroups, ...this.enemyGroups].forEach(group => {
       if (!group.alive) return;
       const dx = group.targetX - group.sprite.x;
       const dy = group.targetY - group.sprite.y;
-      const dist = Math.sqrt(dx * dx + dy * dy);
+      const dist = Math.sqrt(dx*dx + dy*dy);
       if (dist < 4) {
         group.sprite.body.setVelocity(0, 0);
       }
     });
 
-    // Draw camera viewport on minimap
     if (this.minimapOverlay) {
       this.minimapOverlay.clear();
       this.minimapOverlay.lineStyle(2, 0xff0000, 1);
@@ -732,134 +804,78 @@ class PlayScene extends Phaser.Scene {
       let mmY = 400 + vwY * scale;
       let mmW = vwW * scale;
       let mmH = vwH * scale;
-
       this.minimapOverlay.strokeRect(mmX, mmY, mmW, mmH);
     }
 
-    // Update waypoints
     this.playerGroups.forEach(group => {
-      if (group.waypoint && group.alive) {
-        const dx = group.targetX - group.sprite.x;
-        const dy = group.targetY - group.sprite.y;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-
-        if (dist < 4) {
-          group.waypoint.destroy();
-          group.waypointLine.destroy();
-          group.waypoint = null;
-          group.waypointLine = null;
-        } else if (group.waypointLine) {
-          group.waypointLine.clear();
-          group.waypointLine.lineStyle(2, 0xffff00, 1);
-          group.waypointLine.beginPath();
-          group.waypointLine.moveTo(group.sprite.x, group.sprite.y);
-          group.waypointLine.lineTo(group.targetX, group.targetY);
-          group.waypointLine.strokePath();
-        }
-      }
-    });
-
-    // Update bullet tracers
-    for (let i = this.bulletTracers.length - 1; i >= 0; i--) {
-      let tracer = this.bulletTracers[i];
-      let elapsed = this.time.now - tracer.startTime;
-      if (elapsed > tracer.lifetime) {
-        tracer.graphics.destroy();
-        this.bulletTracers.splice(i, 1);
-      } else {
-        tracer.dashOffset += 0.5;
-        tracer.graphics.clear();
-        tracer.graphics.lineStyle(2, 0xffff00, 1);
-        tracer.graphics.beginPath();
-        this.drawDashedLine(
-          tracer.graphics,
-          tracer.attacker.sprite.x, tracer.attacker.sprite.y,
-          tracer.defender.sprite.x, tracer.defender.sprite.y,
-          10, 5, tracer.dashOffset
-        );
-        tracer.graphics.strokePath();
-      }
-    }
-
-    // Update enemy HP text if applicable
-    this.enemyGroups.forEach(enemy => {
-      if (enemy.alive && enemy.sprite && enemy.sprite.hpText) {
-        enemy.sprite.hpText.setText(enemy.hp.toString());
+      if (!group.alive || !group.waypoint) return;
+      const dx = group.targetX - group.sprite.x;
+      const dy = group.targetY - group.sprite.y;
+      const dist = Math.sqrt(dx*dx + dy*dy);
+      if (dist < 4) {
+        if (group.waypoint) { group.waypoint.destroy(); group.waypoint = null; }
+        if (group.waypointLine) { group.waypointLine.destroy(); group.waypointLine = null; }
+      } else if (group.waypointLine) {
+        group.waypointLine.clear().lineStyle(2, 0xffff00, 1).beginPath();
+        group.waypointLine.moveTo(group.sprite.x, group.sprite.y);
+        group.waypointLine.lineTo(group.targetX, group.targetY);
+        group.waypointLine.strokePath();
       }
     });
   }
 
-  drawDashedLine(graphics, x1, y1, x2, y2, dashLength, gapLength, offset = 0) {
-    const dx = x2 - x1;
-    const dy = y2 - y1;
-    const angle = Math.atan2(dy, dx);
-    const distance = Phaser.Math.Distance.Between(x1, y1, x2, y2);
-    let drawn = -offset;
-
-    while (drawn < distance) {
-      let start = Math.max(drawn, 0);
-      let end = drawn + dashLength;
-      if (end > distance) {
-        end = distance;
-      }
-      if (start < distance) {
-        let startX = x1 + Math.cos(angle) * start;
-        let startY = y1 + Math.sin(angle) * start;
-        let endX = x1 + Math.cos(angle) * end;
-        let endY = y1 + Math.sin(angle) * end;
-        graphics.moveTo(startX, startY);
-        graphics.lineTo(endX, endY);
-      }
-      drawn += dashLength + gapLength;
-    }
-  }
-
-  // Each shot -> "spaceAttack" + bullet tracer
-  createBulletTracer(attacker, defender) {
-    this.sound.play('spaceAttack');
-    let tracer = {
-      graphics: this.add.graphics(),
-      attacker: attacker,
-      defender: defender,
-      dashOffset: 0,
-      lifetime: 500,
-      startTime: this.time.now
-    };
-    this.bulletTracers.push(tracer);
-  }
-
-  // Show portrait on main map for 4s
+  /**
+   * showPortrait: when a portrait is displayed, play that character's voice (no overlap).
+   */
   showPortrait(portraitKey) {
-    // Fade out any currently active portraits
-    if (this.activePortraits && this.activePortraits.length > 0) {
-      this.activePortraits.forEach(portrait => {
+    // If a voice is currently playing, stop it so new voice won't overlap
+    if (this.currentVoiceSound && this.currentVoiceSound.isPlaying) {
+      this.currentVoiceSound.stop();
+      this.currentVoiceSound = null;
+    }
+
+    // Fade out existing portraits
+    if (this.activePortraits.length > 0) {
+      this.activePortraits.forEach(p => {
         this.tweens.add({
-          targets: portrait,
+          targets: p,
           alpha: 0,
           duration: 300,
-          onComplete: () => {
-            portrait.destroy();
-          }
+          onComplete: () => p.destroy()
         });
       });
       this.activePortraits = [];
     }
 
+    // *** Map from portraitKey to voice key ***:
+    const voiceMap = {
+      asahina: 'asahinaVoice',
+      haruhi:  'haruhiVoice',
+      nagato:  'nagatoVoice',
+      koizumi: 'koizumiVoice',
+      kyon:    'kyonVoice'
+    };
+
+    // Attempt to get the correct voice from the portraitKey
+    const voiceKey = voiceMap[portraitKey];
+
+    // If found a matching voice, play it
+    if (voiceKey) {
+      // Start playing the voice
+      this.currentVoiceSound = this.sound.add(voiceKey);
+      this.currentVoiceSound.play();
+    }
+
     const startX = -200;
     const bottomY = this.game.config.height;
-    let portrait = this.add.image(startX, bottomY, portraitKey);
-    portrait.setScrollFactor(0);
-    portrait.setDepth(9999);
-    portrait.setScale(0.75);
-    portrait.setOrigin(0.5, 1);
+    let portrait = this.add.image(startX, bottomY, portraitKey)
+      .setScrollFactor(0).setDepth(9999).setScale(0.75).setOrigin(0.5, 1);
 
-    // Exclude from minimap + UI cameras
     this.minimapCamera.ignore(portrait);
     this.uiCamera.ignore(portrait);
 
     this.activePortraits.push(portrait);
 
-    // Slide in, wait 4s, fade out
     this.tweens.add({
       targets: portrait,
       x: 350,
