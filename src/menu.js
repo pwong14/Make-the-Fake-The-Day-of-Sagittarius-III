@@ -4,99 +4,148 @@ class MenuScene extends Phaser.Scene {
   }
 
   preload() {
-    // Load the battle theme so it can be played immediately
+    // Load the battle theme so it can be played
     this.load.audio('battleTheme', 'assets/battleTheme.mp3');
   }
 
   create() {
-    // Immediately start playing the battle theme (loop if you want continuous music)
-    // e.g. { loop: true, volume: 0.1 } for infinite loop at 10% volume
+    // Start music (loop, ~10% volume)
     this.bgm = this.sound.add('battleTheme', { loop: true, volume: 0.1 });
     this.bgm.play();
 
     const { width, height } = this.sys.game.config;
 
-    // 1) Dark background
-    const bgGraphics = this.add.graphics();
-    bgGraphics.fillStyle(0x000000, 1);
-    bgGraphics.fillRect(0, 0, width, height);
+    // 1) Background: black + subtle gradient + starfield
+    const bg = this.add.graphics();
+    bg.fillStyle(0x000000, 1);
+    bg.fillRect(0, 0, width, height);
 
-    // 2) Random starfield
-    const starCount = 200;
-    for (let i = 0; i < starCount; i++) {
-      const x = Phaser.Math.Between(0, width);
-      const y = Phaser.Math.Between(0, height);
-      const alpha = Phaser.Math.FloatBetween(0.3, 1);
-      const size = Phaser.Math.Between(1, 3);
-
-      bgGraphics.fillStyle(0xffffff, alpha);
-      bgGraphics.fillPoint(x, y, size);
+    const steps = height;
+    for (let i = 0; i < steps; i++) {
+      let t = i / steps;
+      const r1 = 27, g1 = 28, b1 = 58;
+      const r2 = 11, g2 = 58, b2 = 58;
+      const r = Phaser.Math.Linear(r1, r2, t);
+      const g = Phaser.Math.Linear(g1, g2, t);
+      const b = Phaser.Math.Linear(b1, b2, t);
+      let color = ((r|0) << 16) | ((g|0) << 8) | (b|0);
+      bg.fillStyle(color, 1);
+      bg.fillRect(0, i, width, 1);
     }
 
-    // 3) Title text
-    this.titleText = this.add.text(width / 2, 100, "THE DAY OF\nSAGITTARIUS III", {
-      fontFamily: 'Georgia, serif',
-      fontSize: '48px',
-      color: '#ffffff',
-      stroke: '#00ff00',    
-      strokeThickness: 3,
-      align: 'center'
-    }).setOrigin(0.5);
+    const starCount = 250;
+    for (let i = 0; i < starCount; i++) {
+      let sx = Phaser.Math.Between(0, width);
+      let sy = Phaser.Math.Between(0, height);
+      let alpha = Phaser.Math.FloatBetween(0.3, 1);
+      let size = Phaser.Math.Between(1, 2);
+      bg.fillStyle(0xffffff, alpha);
+      bg.fillPoint(sx, sy, size);
+    }
 
-    // Helper to create a rectangular button with hover
-    const createButton = (label, x, y, callback) => {
+    // 2) Main Title Layout
+    const sagText = this.add.text(width / 2, 150, "SAGITTARIUS", {
+      fontFamily: 'Georgia, serif',
+      fontSize: '72px',
+      color: '#ffffff',
+      stroke: '#79ff79',
+      strokeThickness: 4
+    }).setOrigin(0.5, 0);
+
+    // Position "THE DAY OF" near the top-left of SAGITTARIUS
+    const sagLeft = sagText.x - sagText.displayWidth / 2;
+    const sagTop  = sagText.y;
+    this.add.text(sagLeft - 10, sagTop - 30, "THE DAY OF", {
+      fontFamily: 'Georgia, serif',
+      fontSize: '32px',
+      color: '#e0e0e0',
+      stroke: '#79ff79',
+      strokeThickness: 2
+    });
+
+    // "III" bigger, below SAGITTARIUS
+    const iiiTextY = sagTop + sagText.displayHeight + 10;
+    this.add.text(width / 2, iiiTextY, "III", {
+      fontFamily: 'Georgia, serif',
+      fontSize: '64px',
+      color: '#ffaa33',
+      stroke: '#000000',
+      strokeThickness: 4
+    }).setOrigin(0.5, 0);
+
+    // 3) Create a single smooth gradient button
+    const createGradientButton = (label, x, y, callback) => {
       const buttonWidth = 180;
       const buttonHeight = 50;
 
-      // Button background
-      const buttonBG = this.add.graphics();
-      buttonBG.fillStyle(0x004400, 1);
-      buttonBG.fillRect(x - buttonWidth / 2, y - buttonHeight / 2, buttonWidth, buttonHeight);
+      // Draw the button with a vertical gradient (top->bottom)
+      let btnGfx = this.add.graphics();
+      btnGfx.fillGradientStyle(
+        0x2b3b55,  // top-left color
+        0x2b3b55,  // top-right color (same for a vertical gradient)
+        0x4f6a8c,  // bottom-left color
+        0x4f6a8c,  // bottom-right color
+        1
+      );
+      btnGfx.fillRect(x - buttonWidth / 2, y - buttonHeight / 2, buttonWidth, buttonHeight);
 
       // Button text
-      const buttonText = this.add.text(x, y, label, {
-        fontFamily: 'Arial, sans-serif',
+      let txt = this.add.text(x, y, label, {
+        fontFamily: 'Georgia, serif',
         fontSize: '24px',
-        color: '#ffffff'
+        color: '#ffffff',
+        stroke: '#79ff79',
+        strokeThickness: 2
       }).setOrigin(0.5);
 
-      // Interactive area
-      buttonBG.setInteractive(
+      // Make the Graphics interactive
+      btnGfx.setInteractive(
         new Phaser.Geom.Rectangle(x - buttonWidth / 2, y - buttonHeight / 2, buttonWidth, buttonHeight),
         Phaser.Geom.Rectangle.Contains
       );
 
-      // Click => callback
-      buttonBG.on('pointerdown', callback);
+      btnGfx.on('pointerdown', callback);
 
-      // Hover effects
-      buttonBG.on('pointerover', () => {
-        buttonBG.clear();
-        buttonBG.fillStyle(0x008800, 1);
-        buttonBG.fillRect(x - buttonWidth / 2, y - buttonHeight / 2, buttonWidth, buttonHeight);
+      // Hover effects: lighten the gradient
+      btnGfx.on('pointerover', () => {
+        btnGfx.clear();
+        btnGfx.fillGradientStyle(
+          0x4f6a8c,  // top-left
+          0x4f6a8c,  // top-right
+          0x6f8aaa,  // bottom-left
+          0x6f8aaa,  // bottom-right
+          1
+        );
+        btnGfx.fillRect(x - buttonWidth / 2, y - buttonHeight / 2, buttonWidth, buttonHeight);
       });
-      buttonBG.on('pointerout', () => {
-        buttonBG.clear();
-        buttonBG.fillStyle(0x004400, 1);
-        buttonBG.fillRect(x - buttonWidth / 2, y - buttonHeight / 2, buttonWidth, buttonHeight);
+
+      btnGfx.on('pointerout', () => {
+        btnGfx.clear();
+        btnGfx.fillGradientStyle(
+          0x2b3b55, // top-left
+          0x2b3b55, // top-right
+          0x4f6a8c, // bottom-left
+          0x4f6a8c, // bottom-right
+          1
+        );
+        btnGfx.fillRect(x - buttonWidth / 2, y - buttonHeight / 2, buttonWidth, buttonHeight);
       });
     };
 
-    // "Start" button => go to PlayScene
-    createButton("Start", width / 2, 300, () => {
+    // 4) Buttons, with a smooth gradient
+    createGradientButton("Start", width / 2, 360, () => {
       this.scene.start('PlayScene');
     });
 
-    // "Tutorial" (not implemented)
-    createButton("Tutorial", width / 2, 400, () => {
-      alert("Tutorial is not implemented yet!");
+    createGradientButton("Tutorial", width / 2, 420, () => {
+      this.scene.start('TutorialScene');
     });
 
-    // Footer text
+    // 5) Footer
     this.add.text(width / 2, height - 30,
       "(C)2006 Kadokawa Shoten / Nagaru Tanigawa / SOS団",
       {
-        fontFamily: 'Arial, sans-serif',
+        fontFamily: 'Georgia, serif',
         fontSize: '14px',
         color: '#ffffff'
       }
